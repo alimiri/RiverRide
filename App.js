@@ -1,18 +1,18 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { StyleSheet, View, Text, PanResponder } from 'react-native';
+import { StyleSheet, View, Text, PanResponder, Dimensions, Image } from 'react-native';
 import { GameEngine } from 'react-native-game-engine';
 import Matter from 'matter-js';
 import { Animated } from 'react-native';
+import airplaneImage from './airplane.png';
 
 export default function App() {
   const [running, setRunning] = useState(true);
+  const [playerPosition, setPlayerPosition] = useState({ x: 100, y: 400 }); // Track position in state
   const engine = useRef(null);
   const world = useRef(null);
 
-    // Variables to store the initial touch position
-    const initialTouch = useRef({ x: 0, y: 0 });
-    const lastTouch = useRef({ x: 0, y: 0 });
-  // Initialize physics engine and player
+  const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+
   const setupWorld = () => {
     const engine = Matter.Engine.create();
     const world = engine.world;
@@ -20,13 +20,15 @@ export default function App() {
     // Disable gravity
     engine.gravity.y = 0;
 
-    // Create player airplane
+    // Create player airplane body
     const player = Matter.Bodies.rectangle(100, 400, 50, 50);
     Matter.World.add(world, [player]);
 
     return {
       physics: { engine, world },
-      player: { body: player, size: [50, 50], color: "blue", renderer: Box },
+      player: { body: player, size: [50, 50], color: "blue", renderer: AirplaneImage },
+      screenWidth,
+      screenHeight
     };
   };
 
@@ -36,8 +38,8 @@ export default function App() {
     useEffect(() => {
       Animated.loop(
         Animated.timing(scrollY, {
-          toValue: -600, // Negative height of the background
-          duration: 5000, // 5 seconds for one full scroll
+          toValue: -600,
+          duration: 5000,
           useNativeDriver: true,
         })
       ).start();
@@ -50,8 +52,8 @@ export default function App() {
           top: 0,
           left: 0,
           right: 0,
-          height: 600, // Adjust to fit your screen
-          backgroundColor: 'lightblue', // Replace with your river image
+          height: 600,
+          backgroundColor: 'lightblue',
           transform: [{ translateY: scrollY }],
         }}
       />
@@ -60,28 +62,39 @@ export default function App() {
 
   const entities = setupWorld();
 
+  // Variables to store initial and last touch positions
+  const initialTouch = useRef({ x: 0, y: 0 });
+  const lastTouch = useRef({ x: 0, y: 0 });
+
   // PanResponder to handle touch and drag movements
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
       onPanResponderGrant: (e, gestureState) => {
-        // Capture the initial touch position
         initialTouch.current = { x: gestureState.x0, y: gestureState.y0 };
         lastTouch.current = initialTouch.current;
       },
       onPanResponderMove: (e, gestureState) => {
-        const deltaX = gestureState.moveX - lastTouch.current.x;
-        const deltaY = gestureState.moveY - lastTouch.current.y;
+        const deltaX = gestureState.moveX - initialTouch.current.x;
+        const deltaY = gestureState.moveY - initialTouch.current.y;
 
-        // Dispatch the move player event based on the difference
-        engine.current.dispatch({
-          type: "move-player",
-          payload: { deltaX, deltaY },
-        });
+        // Calculate the new position
+        let newX = entities.player.body.position.x + deltaX;
+        let newY = entities.player.body.position.y + deltaY;
 
-        // Update the last touch position
-        lastTouch.current = { x: gestureState.moveX, y: gestureState.moveY };
+        // Prevent the box from moving off the left and right edges
+        const halfWidth = entities.player.size[0] / 2;
+        if (newX < halfWidth) newX = halfWidth; // Left edge
+        if (newX > screenWidth - halfWidth) newX = screenWidth - halfWidth; // Right edge
+
+        // Update the position using Matter.Body.setPosition
+        Matter.Body.setPosition(entities.player.body, { x: newX, y: newY });
+
+        // Update state to re-render the box in React
+        setPlayerPosition({ x: newX, y: newY });
+
+        initialTouch.current = { x: gestureState.moveX, y: gestureState.moveY };
       },
     })
   ).current;
@@ -110,51 +123,41 @@ export default function App() {
 // Physics system
 const Physics = (entities, { time, events }) => {
   let { engine } = entities.physics;
+  const { screenWidth, screenHeight } = entities;
 
   Matter.Engine.update(engine, time.delta);
-
-  let player = entities.player.body;
-
-  // Process "move-player" event to update the player's position
-  events.forEach((event) => {
-    if (event.type === "move-player") {
-      const { deltaX, deltaY } = event.payload;
-
-      // Apply the difference (delta) to the player's position
-      Matter.Body.translate(player, { x: deltaX, y: deltaY });
-    }
-  });
 
   return entities;
 };
 
-// Box Renderer for Airplane
-const Box = ({ body, size, color }) => {
+// Airplane Renderer with Image
+const AirplaneImage = ({ body, size, color }) => {
     const x = body.position.x - size[0] / 2;
     const y = body.position.y - size[1] / 2;
+
     return (
-      <View
+      <Image
+        source={require('./airplane.png')} // Replace with your local asset or external URL
         style={{
           position: "absolute",
           left: x,
           top: y,
           width: size[0],
           height: size[1],
-          backgroundColor: color,
         }}
       />
     );
   };
 
-  const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: "black" },
-    gameContainer: { flex: 1 },
-    gameOverText: {
-      color: "white",
-      fontSize: 30,
-      textAlign: "center",
-      position: "absolute",
-      top: "50%",
-      width: "100%",
-    },
-  });
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: "black" },
+  gameContainer: { flex: 1 },
+  gameOverText: {
+    color: "white",
+    fontSize: 30,
+    textAlign: "center",
+    position: "absolute",
+    top: "50%",
+    width: "100%",
+  },
+});
