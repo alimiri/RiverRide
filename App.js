@@ -3,7 +3,6 @@ import { StyleSheet, View, Text, PanResponder, Dimensions, Image } from 'react-n
 import { GameEngine } from 'react-native-game-engine';
 import Matter from 'matter-js';
 import { Animated } from 'react-native';
-import airplaneImage from './airplane.png';
 
 export default function App() {
   const [running, setRunning] = useState(true);
@@ -19,10 +18,13 @@ export default function App() {
 
     // Disable gravity
     engine.gravity.y = 0;
+  // Set the initial position of the player
+  const playerX = screenWidth / 2;  // Center horizontally
+  const playerY = screenHeight * 0.9;  // 10% from the bottom
 
-    // Create player airplane body
-    const player = Matter.Bodies.rectangle(100, 400, 50, 50);
-    Matter.World.add(world, [player]);
+  // Create player airplane body
+  const player = Matter.Bodies.rectangle(playerX, playerY, 50, 50);
+  Matter.World.add(world, [player]);
 
     return {
       physics: { engine, world },
@@ -77,27 +79,29 @@ export default function App() {
       },
       onPanResponderMove: (e, gestureState) => {
         const deltaX = gestureState.moveX - initialTouch.current.x;
-        const deltaY = gestureState.moveY - initialTouch.current.y;
 
-        // Calculate the new position
+        // Calculate the new position only horizontally
         let newX = entities.player.body.position.x + deltaX;
-        let newY = entities.player.body.position.y + deltaY;
 
         // Prevent the box from moving off the left and right edges
         const halfWidth = entities.player.size[0] / 2;
         if (newX < halfWidth) newX = halfWidth; // Left edge
         if (newX > screenWidth - halfWidth) newX = screenWidth - halfWidth; // Right edge
 
+        // Fix vertical position to be 10% from the bottom
+        const newY = screenHeight * 0.9;
+
         // Update the position using Matter.Body.setPosition
         Matter.Body.setPosition(entities.player.body, { x: newX, y: newY });
 
-        // Update state to re-render the box in React
+        // Update React state to re-render the airplane
         setPlayerPosition({ x: newX, y: newY });
 
         initialTouch.current = { x: gestureState.moveX, y: gestureState.moveY };
       },
     })
   ).current;
+
 
   return (
     <View style={styles.container} {...panResponder.panHandlers}>
@@ -137,7 +141,7 @@ const AirplaneImage = ({ body, size, color }) => {
 
     return (
       <Image
-        source={require('./airplane.png')} // Replace with your local asset or external URL
+        source={require('./assets/airplane.png')} // Replace with your local asset or external URL
         style={{
           position: "absolute",
           left: x,
