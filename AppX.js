@@ -118,21 +118,18 @@ export default function App() {
           const deltaX = gestureState.moveX - initialTouch.current.x;
 
           // Calculate the new position only horizontally
-          let newX = entities.player.body.position.x + deltaX;
+          let newX = entitiesRef.current.player.body.position.x + deltaX;
 
           // Prevent the box from moving off the left and right edges
-          const halfWidth = entities.player.size[0] / 2;
+          const halfWidth = entitiesRef.current.player.size[0] / 2;
           if (newX < halfWidth) newX = halfWidth; // Left edge
           if (newX > screenWidth - halfWidth) newX = screenWidth - halfWidth; // Right edge
 
           // Fix vertical position to be 10% from the bottom
           const newY = screenHeight * 0.8;
 
-          // Update the position using Matter.Body.setPosition
-          Matter.Body.setPosition(entities.player.body, { x: newX, y: newY });
-
-          // Update React state to re-render the airplane
-          setPlayerPosition({ x: newX, y: newY });
+          Matter.Body.setPosition(entitiesRef.current.player.body, { x: newX, y: newY });
+          entitiesRef.current.player.body.position = { x: newX, y: newY }; // Sync to the ref
 
           initialTouch.current = { x: gestureState.moveX, y: gestureState.moveY };
         },
@@ -141,11 +138,11 @@ export default function App() {
 
 
   return (
-    <View style={styles.container} {...panResponder.panHandlers}>
+    <View style={memoizedStyles.container} {...panResponder.panHandlers}>
       <ScrollingBackground />
       <GameEngine
         ref={engine}
-        style={styles.gameContainer}
+        style={memoizedStyles.gameContainer}
         systems={[Physics]}
         entities={entities}
         running={running}
@@ -155,7 +152,7 @@ export default function App() {
           }
         }}
       >
-        {!running && <Text style={styles.gameOverText}>Game Over</Text>}
+        {!running && <Text style={memoizedStyles.gameOverText}>Game Over</Text>}
       </GameEngine>
 
       {/* Shoot Button */}
@@ -166,11 +163,23 @@ export default function App() {
   );
 }
 
-const Physics = (entities, { time, events }) => {
+const Physics = (entities, { time }) => {
   let { engine } = entities.physics;
-  const { screenWidth, screenHeight } = entities;
 
+  // Update the physics engine
   Matter.Engine.update(engine, time.delta);
+
+  // Sync the player's position with the body
+  const player = entities.player;
+  console.log("Before engine update:", player.body.position);
+
+  // Update player position to the ref
+  player.position = {
+    x: player.body.position.x,
+    y: player.body.position.y,
+  };
+
+  console.log("After engine update:", player.body.position);
 
   return entities;
 };
@@ -192,7 +201,7 @@ const AirplaneImage = ({ body, size }) => {
   );
 };
 
-const styles = (screenWidth, screenHeight) => ({
+  const styles = (screenWidth, screenHeight) => ({
   container: { flex: 1, backgroundColor: "black" },
   gameContainer: { flex: 1 },
   gameOverText: {
