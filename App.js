@@ -1,12 +1,19 @@
 import React, { useRef, useState, useEffect, useMemo } from 'react';
-import { StyleSheet, View, Text, PanResponder, Dimensions, Image, TouchableOpacity } from 'react-native';
-import { GameEngine } from 'react-native-game-engine';
+import { StyleSheet, View, Text, Dimensions, Image, TouchableOpacity, Animated } from 'react-native';
 import Matter from 'matter-js';
-import { Animated } from 'react-native';
+import MovementArea from './MovementArea'; // Import the new MovementArea
+import { PanResponder } from 'react-native';
+
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const AIRPLANE_WIDTH = 50; // Width of the airplane
 
 export default function App() {
+  const [score, setScore] = useState(0);
+  const [fuel, setFuel] = useState(100);
+  const [playerPosition, setPlayerPosition] = useState({ x: 100 });
+  const velocityRef = useRef(0); // Control smooth movement
+  const animationFrame = useRef(null); // Reference to animation frame
   const [running, setRunning] = useState(true);
-  const [playerPosition, setPlayerPosition] = useState({ x: 100, y: 400 }); // Track position in state
   const [bullets, setBullets] = useState([]); // Store bullets
   const engine = useRef(null);
   const world = useRef(null);
@@ -17,26 +24,60 @@ export default function App() {
 
   const entitiesRef = useRef(null);  // Ref to store entities
 
+  const moveAirplane = () => {
+    setPlayerPosition((prev) => {
+      const newX = prev.x + velocityRef.current;
+
+      // Clamp position to the screen boundaries
+      const clampedX = Math.max(AIRPLANE_WIDTH / 2, Math.min(SCREEN_WIDTH - AIRPLANE_WIDTH / 2, newX));
+
+      // Update Matter.js body position
+      Matter.Body.setPosition(entitiesRef.current.player.body, { x: clampedX, y: prev.y });
+
+      return { x: clampedX, y: prev.y };
+    });
+
+    animationFrame.current = requestAnimationFrame(moveAirplane);
+  };
+
+  const handleShoot = () => {
+    console.log('Shoot action!');
+    // Add logic for shooting here
+  };
+
+  const startMoving = (direction) => {
+    velocityRef.current = direction === 'left' ? -5 : 5;
+    if (!animationFrame.current) moveAirplane();
+  };
+
+  const stopMoving = () => {
+    velocityRef.current = 0;
+    if (animationFrame.current) {
+      cancelAnimationFrame(animationFrame.current);
+      animationFrame.current = null;
+    }
+  };
+
   const setupWorld = () => {
     const engine = Matter.Engine.create();
     const world = engine.world;
 
     engine.gravity.y = 0;
-  const playerX = screenWidth / 2;
-  const playerY = screenHeight * 0.8;
+    const playerX = screenWidth / 2;
+    const playerY = screenHeight * 0.8;
 
-  // Create player airplane body
-  const player = Matter.Bodies.rectangle(playerX, playerY, 50, 50);
-  Matter.World.add(world, [player]);
+    // Create player airplane body
+    const player = Matter.Bodies.rectangle(playerX, playerY, 50, 50);
+    Matter.World.add(world, [player]);
 
-  entitiesRef.current = {
-    physics: { engine, world },
-    player: { body: player, size: [50, 50], color: "blue", renderer: AirplaneImage },
-    screenWidth,
-    screenHeight,
-  };
+    entitiesRef.current = {
+      physics: { engine, world },
+      player: { body: player, size: [50, 50], color: "blue", renderer: AirplaneImage },
+      screenWidth,
+      screenHeight,
+    };
 
-  return entitiesRef.current;  // Return ref object
+    return entitiesRef.current;  // Return ref object
   };
 
   const shootBullet = () => {
@@ -52,6 +93,51 @@ export default function App() {
     Matter.World.add(world.current, [bullet]);
     setBullets((prevBullets) => [...prevBullets, bullet]); // Add bullet to state
   };
+
+  // Handle bullet movement
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (entitiesRef.current) {
+        setBullets((prevBullets) => {
+          return prevBullets
+            .map((bullet) => {
+              Matter.Body.translate(bullet, { x: 0, y: -bulletSpeed });
+              return bullet;
+            })
+            .filter((bullet) => bullet.position.y > 0); // Remove bullets that move off screen
+        });
+      }
+    }, 1000 / 60); // Update every frame
+
+    return () => clearInterval(interval);
+  }, []);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: (e, gestureState) => {
+        initialTouch.current = { x: gestureState.x0, y: gestureState.y0 };
+        lastTouch.current = initialTouch.current;
+      },
+      onPanResponderMove: (e, gestureState) => {
+        const deltaX = gestureState.moveX - lastTouch.current.x;
+
+        let newX = entitiesRef.current.player.body.position.x + deltaX;
+
+        // Clamp within screen boundaries
+        const halfWidth = entitiesRef.current.player.size[0] / 2;
+        if (newX < halfWidth) newX = halfWidth;
+        if (newX > screenWidth - halfWidth) newX = screenWidth - halfWidth;
+
+        Matter.Body.setPosition(entitiesRef.current.player.body, { x: newX, y: entitiesRef.current.player.body.position.y });
+
+        setPlayerPosition({ x: newX, y: entitiesRef.current.player.body.position.y });
+
+        lastTouch.current = { x: gestureState.moveX, y: gestureState.moveY };
+      },
+    })
+  ).current;
 
   const ScrollingBackground = () => {
     const scrollY = useRef(new Animated.Value(0)).current;
@@ -83,85 +169,42 @@ export default function App() {
 
   const entities = useRef(setupWorld()).current;
 
-  // Variables to store initial and last touch positions
-  const initialTouch = useRef({ x: 0, y: 0 });
-  const lastTouch = useRef({ x: 0, y: 0 });
-
-    // Handle bullet movement
-    useEffect(() => {
-      const interval = setInterval(() => {
-        if (entitiesRef.current) {
-          setBullets((prevBullets) => {
-            return prevBullets
-              .map((bullet) => {
-                Matter.Body.translate(bullet, { x: 0, y: -bulletSpeed });
-                return bullet;
-              })
-              .filter((bullet) => bullet.position.y > 0); // Remove bullets that move off screen
-          });
-        }
-      }, 1000 / 60); // Update every frame
-
-      return () => clearInterval(interval);
-    }, []);
-
-
-    const panResponder = useRef(
-      PanResponder.create({
-        onStartShouldSetPanResponder: () => true,
-        onMoveShouldSetPanResponder: () => true,
-        onPanResponderGrant: (e, gestureState) => {
-          initialTouch.current = { x: gestureState.x0, y: gestureState.y0 };
-          lastTouch.current = initialTouch.current;
-        },
-        onPanResponderMove: (e, gestureState) => {
-          const deltaX = gestureState.moveX - initialTouch.current.x;
-
-          // Calculate the new position only horizontally
-          let newX = entities.player.body.position.x + deltaX;
-
-          // Prevent the box from moving off the left and right edges
-          const halfWidth = entities.player.size[0] / 2;
-          if (newX < halfWidth) newX = halfWidth; // Left edge
-          if (newX > screenWidth - halfWidth) newX = screenWidth - halfWidth; // Right edge
-
-          // Fix vertical position to be 10% from the bottom
-          const newY = screenHeight * 0.8;
-
-          // Update the position using Matter.Body.setPosition
-          Matter.Body.setPosition(entities.player.body, { x: newX, y: newY });
-
-          // Update React state to re-render the airplane
-          setPlayerPosition({ x: newX, y: newY });
-
-          initialTouch.current = { x: gestureState.moveX, y: gestureState.moveY };
-        },
-      })
-    ).current;
-
-
   return (
-    <View style={styles.container} {...panResponder.panHandlers}>
-      <ScrollingBackground />
-      <GameEngine
-        ref={engine}
-        style={styles.gameContainer}
-        systems={[Physics]}
-        entities={entities}
-        running={running}
-        onEvent={(e) => {
-          if (e.type === "game-over") {
-            setRunning(false);
-          }
-        }}
-      >
-        {!running && <Text style={styles.gameOverText}>Game Over</Text>}
-      </GameEngine>
+    <View style={memoizedStyles.container}>
+      {/* Top Info Strip */}
+      <View style={memoizedStyles.infoStrip}>
+        <Text style={memoizedStyles.infoText}>Score: {score}</Text>
+        <Text style={memoizedStyles.infoText}>Fuel: {fuel}</Text>
+      </View>
 
-      {/* Shoot Button */}
-      <TouchableOpacity style={memoizedStyles.shootButton} onPress={shootBullet}>
-        <Text style={memoizedStyles.shootButtonText}>Shoot</Text>
-      </TouchableOpacity>
+      {/* Background Area */}
+      <View style={memoizedStyles.background}>
+        {/* Scrolling Background */}
+        <ScrollingBackground />
+
+        {/* Airplane */}
+        <Image
+          source={require('./assets/airplane.png')} // Replace with your airplane image
+          style={[memoizedStyles.airplane, { left: playerPosition.x - AIRPLANE_WIDTH / 2 }]}
+        />
+      </View>
+
+      {/* Bottom Controls Strip */}
+      <View style={memoizedStyles.controlsStrip}>
+        {/* Left: Shoot Button */}
+        <TouchableOpacity style={memoizedStyles.shootArea} onPress={handleShoot}>
+          <Text style={memoizedStyles.controlText}>Shoot</Text>
+        </TouchableOpacity>
+
+        {/* Right: Movement Area */}
+        <MovementArea
+          onTapLeft={() => startMoving('left')}
+          onTapRight={() => startMoving('right')}
+          onHoldLeft={() => startMoving('left')}
+          onHoldRight={() => startMoving('right')}
+          onStop={stopMoving}
+        />
+      </View>
     </View>
   );
 }
@@ -182,7 +225,7 @@ const AirplaneImage = ({ body, size }) => {
     <Image
       source={require('./assets/airplane.png')}
       style={{
-        position: "absolute",
+        position: 'absolute',
         left: x,
         top: y,
         width: size[0],
@@ -193,26 +236,45 @@ const AirplaneImage = ({ body, size }) => {
 };
 
 const styles = (screenWidth, screenHeight) => ({
-  container: { flex: 1, backgroundColor: "black" },
-  gameContainer: { flex: 1 },
-  gameOverText: {
-    color: "white",
-    fontSize: 30,
-    textAlign: "center",
-    position: "absolute",
-    top: "50%",
-    width: "100%",
+  container: { flex: 1, backgroundColor: 'black' },
+
+  // Top Info Strip
+  infoStrip: {
+    height: screenHeight * 0.05,
+    backgroundColor: '#333',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 10,
   },
-  shootButton: {
+  infoText: { color: 'white', fontSize: 16 },
+
+  // Background Area
+  background: { flex: 1, position: 'relative', overflow: 'hidden' },
+  scrollingBackground: {
+    position: 'absolute',
+    width: screenWidth,
+    height: screenHeight,
+    resizeMode: 'cover',
+  },
+  airplane: {
     position: 'absolute',
     bottom: 50,
-    left: screenWidth / 2 - 50,
-    backgroundColor: 'red',
-    padding: 10,
-    borderRadius: 5,
+    width: AIRPLANE_WIDTH,
+    height: AIRPLANE_WIDTH,
   },
-  shootButtonText: {
-    color: 'white',
-    fontSize: 20,
+
+  // Bottom Controls Strip
+  controlsStrip: {
+    height: screenHeight * 0.2,
+    flexDirection: 'row',
+    backgroundColor: '#222',
   },
+  shootArea: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#550000',
+  },
+  controlText: { color: 'white', fontSize: 18 },
 });
