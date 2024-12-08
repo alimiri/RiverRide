@@ -18,7 +18,7 @@ export default function generateRiverSegments(minWidth, maxWidth, minLength, max
 
     let endWidth;
     for (let i = 0; i < numSegments; i++) {
-        const length = minLength + Math.floor((maxLength - minLength) * randomH.next());
+        let length = minLength + Math.floor((maxLength - minLength) * randomH.next());
         if(i === 0) {
             startWidth = Math.floor(randomW.next() * (maxWidth - minWidth + 1)) + minWidth;
             endWidth = startWidth;
@@ -27,12 +27,13 @@ export default function generateRiverSegments(minWidth, maxWidth, minLength, max
             endWidth = startWidth;
         } else {
             const r = randomW.next();
-            if(r > 0.45 || r < 0.55) {//sharp
+            if(r > 0.45 && r < 0.55) {//sharp change the width
                 startWidth = Math.floor(randomW.next() * (maxWidth - minWidth + 1)) + minWidth;
                 endWidth = startWidth;
             } else {
                 startWidth = segments[i-1].endWidth;
                 endWidth = Math.floor(randomW.next() * (maxWidth - minWidth + 1)) + minWidth;
+                length = minLength;
             }
         }
         // Push the segment (startWidth, endWidth, length)

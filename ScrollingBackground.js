@@ -1,12 +1,25 @@
 import React, { useEffect, useState } from 'react';
 import { View, Animated } from 'react-native';
+import { Audio } from 'expo-av';
 import RiverVisualization from './RiverVisualization'; // Import your RiverVisualization component
 
 const ScrollingBackground = ({ width, height, riverSegments, speed = 5000 }) => {
     const totalHeight = riverSegments.reduce((acc, segment) => acc + segment.length, 0); // Total height of river segments
     const [scrollY] = useState(new Animated.Value(totalHeight - height)); // Animated value for vertical scrolling
+    const [sound, setSound] = useState();
 
     useEffect(() => {
+        // Load and play the sound
+        const loadSound = async () => {
+            const { sound } = await Audio.Sound.createAsync(
+                require('./assets/airplane-engine.mp3'),
+                { shouldPlay: true, isLooping: true } // Loop the sound
+            );
+            setSound(sound);
+        };
+
+        loadSound();
+
         const animationConfig = {
             toValue: 0, // Final value to scroll to
             duration: (totalHeight - height) / height * speed,
@@ -19,8 +32,16 @@ const ScrollingBackground = ({ width, height, riverSegments, speed = 5000 }) => 
             { iterations: -1 } // Infinite loop
         ).start();
 
-        return () => scrollY.stop();  // Cleanup on unmount
+        // Cleanup function
+        return () => {
+            if (sound) {
+                sound.stopAsync(); // Stop sound when component is unmounted
+                sound.unloadAsync(); // Release the sound resources
+            }
+            scrollY.stopAnimation();  // Stop the animation
+        };
     }, [riverSegments, height, scrollY, speed]); // Include riverSegments to replay animation if changed
+
     return (
         <View style={{ width, height, backgroundColor: 'lightblue', overflow: 'hidden' }}>
             <Animated.View
