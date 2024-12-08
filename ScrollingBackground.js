@@ -3,19 +3,24 @@ import { View, Animated } from 'react-native';
 import RiverVisualization from './RiverVisualization'; // Import your RiverVisualization component
 
 const ScrollingBackground = ({ width, height, riverSegments, speed = 5000 }) => {
-    const [scrollY] = useState(new Animated.Value(0)); // Create an animated value for vertical scrolling
+    const totalHeight = riverSegments.reduce((acc, segment) => acc + segment.length, 0); // Total height of river segments
+    const [scrollY] = useState(new Animated.Value(totalHeight - height)); // Animated value for vertical scrolling
 
     useEffect(() => {
-        // Define the vertical scrolling animation
-        Animated.loop(
-            Animated.timing(scrollY, {
-                toValue: -height, // Scroll upward by the height of the screen
-                duration: speed,  // Duration controls the speed of the scroll
-                useNativeDriver: true,
-            })
-        ).start();
-    }, [scrollY, height, speed]);
+        const animationConfig = {
+            toValue: 0, // Final value to scroll to
+            duration: (totalHeight - height) / height * speed,
+            useNativeDriver: true,
+        };
 
+        // Start the animation
+        Animated.loop(
+            Animated.timing(scrollY, animationConfig),
+            { iterations: -1 } // Infinite loop
+        ).start();
+
+        return () => scrollY.stop();  // Cleanup on unmount
+    }, [riverSegments, height, scrollY, speed]); // Include riverSegments to replay animation if changed
     return (
         <View style={{ width, height, backgroundColor: 'lightblue', overflow: 'hidden' }}>
             <Animated.View
@@ -24,15 +29,15 @@ const ScrollingBackground = ({ width, height, riverSegments, speed = 5000 }) => 
                     top: 0,
                     left: 0,
                     width,
-                    height: height * 2, // Double the height for seamless looping
-                    transform: [{ translateY: scrollY }], // Apply vertical scrolling animation
+                    height: totalHeight, // Ensuring the total height is applied
+                    transform: [{ rotate: '180deg' }, { translateY: scrollY }], // Apply vertical animation
                 }}
             >
-                {/* Render the river visualization across the extended height */}
+                {/* Render river visualization with total height */}
                 <RiverVisualization
                     width={width}
-                    height={height}
-                    riverSegments={riverSegments}
+                    totalHeight={totalHeight}
+                    riverSegments={riverSegments} // Do not pass height here, let the RiverVisualization calculate it
                 />
             </Animated.View>
         </View>

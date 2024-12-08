@@ -117,7 +117,7 @@ export default function App() {
   // Function to generate and update river segments
   useEffect(() => {
     const generateRiver = () => {
-      const segments = riverSegmentGenerator(screenWidth / 2, screenWidth, screenHeight / 2, screenHeight * 5, 500, 1, 2); // Generate 10 river segments
+      const segments = riverSegmentGenerator(screenWidth / 2, screenWidth, screenHeight / 2, screenHeight * 5, 100, 1, 2);
       setRiverSegments(segments);
     };
 
@@ -166,7 +166,10 @@ export default function App() {
         {/* Background Area */}
         <View style={memoizedStyles.background}>
           {/* Display the scrolling background with the river segments */}
-          <ScrollingBackground width={screenWidth} height={screenHeight} riverSegments={riverSegments} speed="5000"/>
+          {riverSegments.length === 0 ? (
+                <Text>Loading...</Text> // Show loading indicator while fetching data
+            ): (<ScrollingBackground width={screenWidth} height={screenHeight} riverSegments={riverSegments} speed="1000"/>
+          )}
 
           {/* Airplane */}
           <Image
