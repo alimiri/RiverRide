@@ -3,14 +3,16 @@ import { StyleSheet, View, Text, Dimensions, Image, TouchableOpacity, Animated }
 import Matter from 'matter-js';
 import MovementArea from './MovementArea'; // Import the new MovementArea
 import { PanResponder } from 'react-native';
+import riverSegmentGenerator from './RiverSegmentGenerator'; // Import the riverSegmentGenerator
+import ScrollingBackground from './ScrollingBackground';  // Import the scrolling background
 
-const SCREEN_WIDTH = Dimensions.get('window').width;
 const AIRPLANE_WIDTH = 50; // Width of the airplane
 
 export default function App() {
   const [score, setScore] = useState(0);
   const [fuel, setFuel] = useState(100);
   const [playerPosition, setPlayerPosition] = useState({ x: 100 });
+  const [riverSegments, setRiverSegments] = useState([]); // Store the river segments
   const velocityRef = useRef(0); // Control smooth movement
   const animationFrame = useRef(null); // Reference to animation frame
   const [running, setRunning] = useState(true);
@@ -29,7 +31,7 @@ export default function App() {
       const newX = prev.x + velocityRef.current;
 
       // Clamp position to the screen boundaries
-      const clampedX = Math.max(AIRPLANE_WIDTH / 2, Math.min(SCREEN_WIDTH - AIRPLANE_WIDTH / 2, newX));
+      const clampedX = Math.max(AIRPLANE_WIDTH / 2, Math.min(screenWidth - AIRPLANE_WIDTH / 2, newX));
 
       // Update Matter.js body position
       Matter.Body.setPosition(entitiesRef.current.player.body, { x: clampedX, y: prev.y });
@@ -112,6 +114,16 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
+  // Function to generate and update river segments
+  useEffect(() => {
+    const generateRiver = () => {
+      const segments = riverSegmentGenerator(screenWidth / 2, screenWidth, screenHeight / 2, screenHeight * 5, 500, 1, 2); // Generate 10 river segments
+      setRiverSegments(segments);
+    };
+
+    generateRiver();
+  }, [screenWidth, screenHeight]);
+
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
@@ -139,71 +151,61 @@ export default function App() {
     })
   ).current;
 
-  const ScrollingBackground = () => {
-    const scrollY = useRef(new Animated.Value(0)).current;
-
-    useEffect(() => {
-      Animated.loop(
-        Animated.timing(scrollY, {
-          toValue: -600,
-          duration: 5000,
-          useNativeDriver: true,
-        })
-      ).start();
-    }, []);
-
-    return (
-      <Animated.View
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          height: 600,
-          backgroundColor: 'lightblue',
-          transform: [{ translateY: scrollY }],
-        }}
-      />
-    );
-  };
-
   const entities = useRef(setupWorld()).current;
 
   return (
-    <View style={memoizedStyles.container}>
-      {/* Top Info Strip */}
-      <View style={memoizedStyles.infoStrip}>
-        <Text style={memoizedStyles.infoText}>Score: {score}</Text>
-        <Text style={memoizedStyles.infoText}>Fuel: {fuel}</Text>
-      </View>
+    <View style={{ flex: 1, position: 'relative' }}>
+      <View style={memoizedStyles.container}>
+        {/* Other game components */}
+        {/* Top Info Strip */}
+        <View style={memoizedStyles.infoStrip}>
+          <Text style={memoizedStyles.infoText}>Score: {score}</Text>
+          <Text style={memoizedStyles.infoText}>Fuel: {fuel}</Text>
+        </View>
 
-      {/* Background Area */}
-      <View style={memoizedStyles.background}>
-        {/* Scrolling Background */}
-        <ScrollingBackground />
+        {/* Background Area */}
+        <View style={memoizedStyles.background}>
+          {/* Display the scrolling background with the river segments */}
+          <ScrollingBackground width={screenWidth} height={screenHeight} riverSegments={riverSegments} speed="5000"/>
 
-        {/* Airplane */}
-        <Image
-          source={require('./assets/airplane.png')} // Replace with your airplane image
-          style={[memoizedStyles.airplane, { left: playerPosition.x - AIRPLANE_WIDTH / 2 }]}
-        />
-      </View>
+          {/* Airplane */}
+          <Image
+            source={require('./assets/airplane.png')} // Replace with your airplane image
+            style={[memoizedStyles.airplane, { left: playerPosition.x - AIRPLANE_WIDTH / 2 }]}
+          />
 
-      {/* Bottom Controls Strip */}
-      <View style={memoizedStyles.controlsStrip}>
-        {/* Left: Shoot Button */}
-        <TouchableOpacity style={memoizedStyles.shootArea} onPress={handleShoot}>
-          <Text style={memoizedStyles.controlText}>Shoot</Text>
-        </TouchableOpacity>
+          {/* Render river segments */}
+          {riverSegments.map((segment, index) => (
+            <View
+              key={index}
+              style={{
+                position: 'absolute',
+                top: segment.y,
+                left: segment.x,
+                width: segment.width,
+                height: segment.height,
+                backgroundColor: 'blue', // Customize river color
+              }}
+            />
+          ))}
+        </View>
 
-        {/* Right: Movement Area */}
-        <MovementArea
-          onTapLeft={() => startMoving('left')}
-          onTapRight={() => startMoving('right')}
-          onHoldLeft={() => startMoving('left')}
-          onHoldRight={() => startMoving('right')}
-          onStop={stopMoving}
-        />
+        {/* Bottom Controls Strip */}
+        <View style={memoizedStyles.controlsStrip}>
+          {/* Left: Shoot Button */}
+          <TouchableOpacity style={memoizedStyles.shootArea} onPress={handleShoot}>
+            <Text style={memoizedStyles.controlText}>Shoot</Text>
+          </TouchableOpacity>
+
+          {/* Right: Movement Area */}
+          <MovementArea
+            onTapLeft={() => startMoving('left')}
+            onTapRight={() => startMoving('right')}
+            onHoldLeft={() => startMoving('left')}
+            onHoldRight={() => startMoving('right')}
+            onStop={stopMoving}
+          />
+        </View>
       </View>
     </View>
   );
