@@ -1,17 +1,23 @@
 import React, { useRef, useState, useEffect, useMemo } from 'react';
-import { StyleSheet, View, Text, Dimensions, Image, TouchableOpacity, Animated } from 'react-native';
+import { StyleSheet, View, Text, Dimensions, Image, TouchableOpacity, Animated, Platform } from 'react-native';
 import Matter from 'matter-js';
 import MovementArea from './MovementArea'; // Import the new MovementArea
 import { PanResponder } from 'react-native';
 import riverSegmentGenerator from './RiverSegmentGenerator'; // Import the riverSegmentGenerator
 import ScrollingBackground from './ScrollingBackground';  // Import the scrolling background
 
+
 const AIRPLANE_WIDTH = 50; // Width of the airplane
+// Dynamic status bar height
+const isIOS = Platform.OS === 'ios';
+const STATUSBAR_HEIGHT = isIOS ? 20 : StatusBar.currentHeight;
+const MAX_SPEED = 150;
+const MIN_SPEED = 50;
 
 export default function App() {
   const [score, setScore] = useState(0);
+  const speed = useRef(100);
   const [fuel, setFuel] = useState(100);
-  const [playerPosition, setPlayerPosition] = useState({ x: 100 });
   const [riverSegments, setRiverSegments] = useState([]); // Store the river segments
   const velocityRef = useRef(0); // Control smooth movement
   const animationFrame = useRef(null); // Reference to animation frame
@@ -22,7 +28,11 @@ export default function App() {
   const bulletSpeed = 5; // Speed at which bullets move
 
   const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+  const [playerPosition, setPlayerPosition] = useState({ x: screenWidth / 2, y: screenHeight * 0.8 });
   const memoizedStyles = useMemo(() => styles(screenWidth, screenHeight), [screenWidth, screenHeight]);
+
+  const RIVER_MAX_WIDTH_RATIO = screenWidth * 0.9; // Maximum width of the river
+  const RIVER_MIN_WIDTH_RATIO = AIRPLANE_WIDTH * 2; // Maximum width of the river
 
   const entitiesRef = useRef(null);  // Ref to store entities
 
@@ -47,9 +57,23 @@ export default function App() {
     // Add logic for shooting here
   };
 
-  const startMoving = (direction) => {
-    velocityRef.current = direction === 'left' ? -5 : 5;
+ const startMoving = (direction) => {
+    if(direction === 'left') {
+      velocityRef.current = -5;
+    } else if(direction === 'right') {
+      velocityRef.current = 5;
+    } else {
+      velocityRef.current = 0;
+    }
     if (!animationFrame.current) moveAirplane();
+  };
+
+  const startAcc = (acc) => {
+    if(acc === 'up') {
+      speed.current = speed.current >= MAX_SPEED ? MAX_SPEED : speed.current + 1;
+    } else if(acc === 'down') {
+      speed.current = speed.current <= MIN_SPEED ? MIN_SPEED : speed.current - 1;
+    }
   };
 
   const stopMoving = () => {
@@ -96,6 +120,22 @@ export default function App() {
     setBullets((prevBullets) => [...prevBullets, bullet]); // Add bullet to state
   };
 
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setFuel((prevFuel) => Math.max(prevFuel - 1, 0)); // Decrease fuel by 1, but not below 0
+    }, 1000); // Decrease fuel every second
+
+    return () => clearInterval(interval); // Cleanup interval on component unmount
+  }, []);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      speed.current -= Math.sign(speed.current - 100);
+    }, 100); // Speed back to normal every tenth second
+
+    return () => clearInterval(interval); // Cleanup interval on component unmount
+  }, []);
+
   // Handle bullet movement
   useEffect(() => {
     const interval = setInterval(() => {
@@ -117,7 +157,7 @@ export default function App() {
   // Function to generate and update river segments
   useEffect(() => {
     const generateRiver = () => {
-      const segments = riverSegmentGenerator(screenWidth / 2, screenWidth, screenHeight / 2, screenHeight * 5, 100, 1, 2);
+      const segments = riverSegmentGenerator(RIVER_MIN_WIDTH_RATIO, RIVER_MAX_WIDTH_RATIO, screenHeight / 2, screenHeight * 5, 100, 1, 2);
       setRiverSegments(segments);
     };
 
@@ -160,6 +200,7 @@ export default function App() {
         {/* Top Info Strip */}
         <View style={memoizedStyles.infoStrip}>
           <Text style={memoizedStyles.infoText}>Score: {score}</Text>
+          <Text style={memoizedStyles.infoText}>Speed: {speed.current}</Text>
           <Text style={memoizedStyles.infoText}>Fuel: {fuel}</Text>
         </View>
 
@@ -204,8 +245,18 @@ export default function App() {
           <MovementArea
             onTapLeft={() => startMoving('left')}
             onTapRight={() => startMoving('right')}
+            onTapMiddle={() => startMoving('still')}
             onHoldLeft={() => startMoving('left')}
             onHoldRight={() => startMoving('right')}
+            onHoldMiddle={() => startMoving('still')}
+
+            onTapUp={() => startAcc('up')}
+            onTapDown={() => startAcc('down')}
+            onTapNoAcc={() => startAcc('noAcc')}
+            onHoldUp={() => startAcc('up')}
+            onHoldDown={() => startAcc('down')}
+            onHoldNoAcc={() => startAcc('noAcc')}
+
             onStop={stopMoving}
           />
         </View>
@@ -245,12 +296,14 @@ const styles = (screenWidth, screenHeight) => ({
 
   // Top Info Strip
   infoStrip: {
-    height: screenHeight * 0.05,
+    top: 20,
+    height: 20 + screenHeight * 0.05,
     backgroundColor: '#333',
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 10,
+    paddingVertical: 10,
   },
   infoText: { color: 'white', fontSize: 16 },
 
