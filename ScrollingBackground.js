@@ -1,12 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { View, Animated } from 'react-native';
 import { Audio } from 'expo-av';
 import RiverVisualization from './RiverVisualization'; // Import your RiverVisualization component
 
-const ScrollingBackground = ({ width, height, riverSegments, speed = 5000 }) => {
-    const totalHeight = riverSegments.reduce((acc, segment) => acc + segment.length, 0); // Total height of river segments
-    const [scrollY] = useState(new Animated.Value(totalHeight - height)); // Animated value for vertical scrolling
+const ScrollingBackground = ({ width, height, riverSegments, speed, scrollY, totalHeight, isGameRunning }) => {
     const [sound, setSound] = useState();
+    const animationRef = useRef(null); // Reference for animation instance
 
     useEffect(() => {
         // Load and play the sound
@@ -20,17 +19,26 @@ const ScrollingBackground = ({ width, height, riverSegments, speed = 5000 }) => 
 
         loadSound();
 
-        const animationConfig = {
-            toValue: 0, // Final value to scroll to
-            duration: (totalHeight - height) / height * speed,
-            useNativeDriver: true,
-        };
+        // Create the animation only once
+        if (!animationRef.current) {
+            const animationConfig = {
+                toValue: 0, // Final value to scroll to
+                duration: (totalHeight - height) / height * 100 / speed * 1000,
+                useNativeDriver: true,
+            };
 
-        // Start the animation
-        Animated.loop(
-            Animated.timing(scrollY, animationConfig),
-            { iterations: -1 } // Infinite loop
-        ).start();
+            animationRef.current = Animated.loop(
+                Animated.timing(scrollY.current, animationConfig),
+                { iterations: -1 }
+            );
+        }
+
+        // Start or stop the animation based on `isGameRunning`
+        if (isGameRunning) {
+            animationRef.current.start();
+        } else {
+            animationRef.current.stop();
+        }
 
         // Cleanup function
         return () => {
@@ -38,9 +46,11 @@ const ScrollingBackground = ({ width, height, riverSegments, speed = 5000 }) => 
                 sound.stopAsync(); // Stop sound when component is unmounted
                 sound.unloadAsync(); // Release the sound resources
             }
-            scrollY.stopAnimation();  // Stop the animation
+            if (animationRef.current) {
+                animationRef.current.stop(); // Stop the animation on unmount
+            }
         };
-    }, [riverSegments, height, scrollY, speed]); // Include riverSegments to replay animation if changed
+    }, [isGameRunning, height, scrollY, speed, totalHeight]); // Re-run only if these dependencies change
 
     return (
         <View style={{ width, height, backgroundColor: 'lightblue', overflow: 'hidden' }}>
@@ -51,7 +61,7 @@ const ScrollingBackground = ({ width, height, riverSegments, speed = 5000 }) => 
                     left: 0,
                     width,
                     height: totalHeight, // Ensuring the total height is applied
-                    transform: [{ rotate: '180deg' }, { translateY: scrollY }], // Apply vertical animation
+                    transform: [{ rotate: '180deg' }, { translateY: scrollY.current }], // Apply vertical animation
                 }}
             >
                 {/* Render river visualization with total height */}

@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect, useMemo } from 'react';
-import { StyleSheet, View, Text, Dimensions, Image, TouchableOpacity, Animated, Platform } from 'react-native';
+import { StyleSheet, View, Text, Dimensions, Image, TouchableOpacity, Animated, Platform, Alert } from 'react-native';
 import Matter from 'matter-js';
 import MovementArea from './MovementArea'; // Import the new MovementArea
 import { PanResponder } from 'react-native';
@@ -26,6 +26,10 @@ export default function App() {
   const engine = useRef(null);
   const world = useRef(null);
   const bulletSpeed = 5; // Speed at which bullets move
+  const scrollY = useRef(new Animated.Value(0));
+  const scrollValueRef = useRef(0);
+  const [isGameRunning, setIsGameRunning] = useState(true);
+  const totalHeight = useRef(undefined);
 
   const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
   const [playerPosition, setPlayerPosition] = useState({ x: screenWidth / 2, y: screenHeight * 0.8 });
@@ -58,6 +62,8 @@ export default function App() {
   };
 
  const startMoving = (direction) => {
+    if (!isGameRunning) return;
+
     if(direction === 'left') {
       velocityRef.current = -5;
     } else if(direction === 'right') {
@@ -120,6 +126,76 @@ export default function App() {
     setBullets((prevBullets) => [...prevBullets, bullet]); // Add bullet to state
   };
 
+
+  // Detect collisions && fuel consumption
+  useEffect(() => {
+    if (!isGameRunning) return;
+
+    if(fuel === 0) {
+      handleCollision();
+    }
+
+    // Set up a listener for scrollY updates
+    const listenerId = scrollY.current.addListener(({ value }) => {
+      scrollValueRef.current = value; // Update the ref with the latest scrollY value
+    });
+
+    let segmentY = totalHeight.current;
+    const currentScrollY = scrollValueRef.current;
+
+    for (let i = 0; i < riverSegments.length; i++) {
+      if (segmentY - riverSegments[i].length < currentScrollY) { // Found the right segment
+        const y = segmentY - currentScrollY; // Calculate the y position relative to the screen
+
+        // Calculate the width and borders of the river at the current y
+        const widthAtY = riverSegments[i].startWidth +
+          (y / riverSegments[i].length) * (riverSegments[i].endWidth - riverSegments[i].startWidth);
+        const leftBorder = (screenWidth - widthAtY) / 2;
+        const rightBorder = leftBorder + widthAtY;
+
+        // Check for collision
+        if (playerPosition.x < leftBorder + AIRPLANE_WIDTH / 2 || playerPosition.x > rightBorder - AIRPLANE_WIDTH / 2) {
+          handleCollision();
+        }
+        break;
+      } else {
+        segmentY -= riverSegments[i].length;
+      }
+    }
+
+    // Clean up listener on unmount
+    return () => {
+      scrollY.current.removeListener(listenerId);
+    };
+  }, [playerPosition, scrollY, isGameRunning, riverSegments, screenWidth, handleCollision, totalHeight]);
+
+
+  const handleCollision = () => {
+      setIsGameRunning(false); // Stop the game
+
+      Alert.alert(
+          "You Crashed!",
+          "Your airplane hit the borders. Restart the game?",
+          [
+              {
+                  text: "Restart",
+                  onPress: restartGame,
+              },
+              {
+                  text: "Cancel",
+                  style: "cancel",
+              },
+          ]
+      );
+  };
+
+  const restartGame = () => {
+    scrollY.current.setValue(totalHeight.current - screenHeight);
+    setFuel(100);
+    setPlayerPosition({ x: screenWidth / 2, y: entitiesRef.current.player.body.position.y });
+    setIsGameRunning(true); // Restart the game
+  };
+
   useEffect(() => {
     const interval = setInterval(() => {
       setFuel((prevFuel) => Math.max(prevFuel - 1, 0)); // Decrease fuel by 1, but not below 0
@@ -157,12 +233,17 @@ export default function App() {
   // Function to generate and update river segments
   useEffect(() => {
     const generateRiver = () => {
-      const segments = riverSegmentGenerator(RIVER_MIN_WIDTH_RATIO, RIVER_MAX_WIDTH_RATIO, screenHeight / 2, screenHeight * 5, 100, 1, 2);
-      setRiverSegments(segments);
+        const segments = riverSegmentGenerator(RIVER_MIN_WIDTH_RATIO, RIVER_MAX_WIDTH_RATIO, screenHeight / 2, screenHeight * 5, 100, 1, 2);
+        totalHeight.current = segments.reduce((acc, segment) => acc + segment.length, 0);
+        if (scrollY.current) {
+            scrollY.current.setValue(totalHeight.current - screenHeight); // Set the scrollY value here
+        }
+
+        setRiverSegments(segments);
     };
 
     generateRiver();
-  }, [screenWidth, screenHeight]);
+}, [screenWidth, screenHeight]);
 
   const panResponder = useRef(
     PanResponder.create({
@@ -209,7 +290,15 @@ export default function App() {
           {/* Display the scrolling background with the river segments */}
           {riverSegments.length === 0 ? (
                 <Text>Loading...</Text> // Show loading indicator while fetching data
-            ): (<ScrollingBackground width={screenWidth} height={screenHeight} riverSegments={riverSegments} speed="1000"/>
+            ): (<ScrollingBackground
+              width={screenWidth}
+              height={screenHeight}
+              riverSegments={riverSegments}
+              speed={speed.current}
+              scrollY={scrollY}
+              totalHeight={totalHeight.current}
+              isGameRunning={isGameRunning}
+            />
           )}
 
           {/* Airplane */}
