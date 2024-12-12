@@ -1,44 +1,80 @@
 import React from 'react';
-import { View } from 'react-native';
+import { View, Image } from 'react-native';
 import Svg, { Polygon } from 'react-native-svg';
 
-const RiverSegment = ({ startWidth, endWidth, length, screenWidth }) => {
-    // Calculate the starting and ending points for the trapezoidal shape
+const RiverSegment = ({ startWidth, endWidth, length, screenWidth, yOffset }) => {
     const startX = (screenWidth - startWidth) / 2;
     const endX = (screenWidth - endWidth) / 2;
 
-    // The points for the trapezoidal polygon
     const points = [
-        { x: startX, y: 0 }, // Top-left corner
-        { x: startX + startWidth, y: 0 }, // Top-right corner
-        { x: endX + endWidth, y: length }, // Bottom-right corner
-        { x: endX, y: length }, // Bottom-left corner
+        { x: startX, y: 0 },
+        { x: startX + startWidth, y: 0 },
+        { x: endX + endWidth, y: length },
+        { x: endX, y: length },
     ];
 
-    // Transform the points into a string format required by the SVG Polygon
     const polygonPoints = points.map(p => `${p.x},${p.y}`).join(' ');
 
     return (
-        <Svg height={length} width={screenWidth}>
+        <Svg height={length} width={screenWidth} style={{ position: 'absolute', top: yOffset }}>
             <Polygon points={polygonPoints} fill="blue" />
         </Svg>
     );
 };
 
-function RiverVisualization({ width, totalHeight, riverSegments }) {
+function RiverVisualization({ width, riverSegments, treeImage }) {
+    let yOffset = 0; // To track the vertical position of the river segments
+
+    const renderTrees = () => {
+        let trees = [];
+        riverSegments.river.forEach((segment, segmentIndex) => {
+            segment.trees.forEach((tree, treeIndex) => {
+                // Calculate the absolute Y position by adding the offset of the previous segments
+                const treeY = tree.y + yOffset;
+                trees.push(
+                    <Image
+                        key={`tree-${segmentIndex}-${treeIndex}`}
+                        source={treeImage} // Pass image as prop
+                        style={{
+                            position: 'absolute',
+                            left: tree.x,
+                            top: treeY,
+                            width: 50,
+                            height: 50,
+                            transform: [{ rotate: '180deg' }], // Apply 180 degree rotation
+                        }}
+                    />
+                );
+            });
+
+            // After rendering trees for the current segment, update the yOffset
+            yOffset += segment.length;
+        });
+
+        return trees;
+    };
+
     return (
-        <View style={{ width, height: totalHeight, flexDirection: 'column', alignItems: 'center' }}>
-            {riverSegments.map((segment, index) => {
+        <View style={{ width, height: riverSegments.totalHeight, flexDirection: 'column', alignItems: 'center', backgroundColor: 'transparent' }}>
+            {riverSegments.river.map((segment, index) => {
+                // Render each segment with its accumulated yOffset
+                const segmentYOffset = yOffset; // The offset is calculated once before rendering each segment
+
+                // Update the yOffset after rendering the segment to keep track of the total height
+                yOffset += segment.length;
+
                 return (
                     <RiverSegment
                         key={index}
                         startWidth={segment.startWidth}
                         endWidth={segment.endWidth}
                         length={segment.length}
-                        screenWidth={width} // Pass the screen width for calculation
+                        screenWidth={width}
+                        yOffset={segmentYOffset} // Pass the accumulated yOffset
                     />
                 );
             })}
+            {renderTrees()}
         </View>
     );
 }
