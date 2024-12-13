@@ -18,7 +18,6 @@ const FUEL_INIT = 100;
 
 let initialPosition;
 
-
 export default function App() {
   const [score, setScore] = useState(0);
   const speed = useRef(SPEED_INIT);
@@ -143,13 +142,10 @@ export default function App() {
 
   onScrollPositionChange = (scrollPosition) => {
     if (!isGameRunning) return;
-
-    let segmentY = riverSegments.totalHeight;
-
+console.log(`scrollPosition: ${scrollPosition}`);
     for (let i = 0; i < riverSegments.river.length; i++) {
-
-      if (segmentY - riverSegments.river[i].length < scrollPosition) {
-        const y = segmentY - scrollPosition; // Calculate the y position relative to the screen
+      if (riverSegments.totalHeight - riverSegments.river[i].offset < scrollPosition) {
+        const y = scrollPosition - (riverSegments.totalHeight - riverSegments.river[i].offset)
 
         // Calculate the width and borders of the river at the current y
         const widthAtY = riverSegments.river[i].startWidth +
@@ -157,21 +153,21 @@ export default function App() {
         leftBorder.current = (screenWidth - widthAtY) / 2;
         rightBorder.current = leftBorder.current + widthAtY;
         const currentX = playerPositionRef.current.x;
-        checkForCollision(currentX);
+        if(checkForCollision(currentX)) {
+          console.log(`totalHeight: ${riverSegments.totalHeight}, screenHeight: ${screenHeight}, scrollPosition: ${scrollPosition}`);
+          console.log(riverSegments.river.filter((segment, index) => index <= i).map((segment, index) => JSON.stringify(segment)).join());
+          console.log(`i: ${i}, riverSegments.river[i].startWidth: ${riverSegments.river[i].startWidth}, riverSegments.river[i].endWidth: ${riverSegments.river[i].endWidth}, y: ${y}, widthAtY: ${widthAtY}, leftBorder.current: ${leftBorder.current}, rightBorder.current: ${rightBorder.current}, currentX: ${currentX}`);
+        }
         break;
-      } else {
-        segmentY -= riverSegments.river[i].length;
       }
     }
   };
 
   const checkForCollision = (xPosition) => {
-    if (!isGameRunning || collisionHandledRef.current) return false;
+    if (!isGameRunning || collisionHandledRef.current) return true;
 
-    if (
-      xPosition < leftBorder.current + AIRPLANE_WIDTH / 2 ||
-      xPosition > rightBorder.current - AIRPLANE_WIDTH / 2
-    ) {
+    if ( xPosition < leftBorder.current + AIRPLANE_WIDTH / 2 || xPosition > rightBorder.current - AIRPLANE_WIDTH / 2) {
+      console.log(`leftBorder: ${leftBorder.current}, rightBorder: ${rightBorder.current}, xPosition: ${xPosition}`);
       handleCollision();
       return true;
     }
@@ -216,6 +212,7 @@ export default function App() {
     setIsGameRunning(true); // Restart the game
     setPlayerPosition(initialPosition); // Reset the player position
     setFuel(FUEL_INIT); // Reset fuel
+    speed.current = SPEED_INIT; // Reset speed
   };
 
   useEffect(() => {

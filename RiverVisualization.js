@@ -30,7 +30,6 @@ function RiverVisualization({ width, riverSegments, treeImage }) {
         riverSegments.river.forEach((segment, segmentIndex) => {
             segment.trees.forEach((tree, treeIndex) => {
                 const treeY = tree.y + segment.offset;
-                console.log(`Tree at x: ${tree.x}, y: ${treeY} (segment offset: ${segment.offset})`);
                 trees.push(
                     <Image
                         key={`tree-${segmentIndex}-${treeIndex}`}
