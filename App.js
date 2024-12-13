@@ -14,11 +14,16 @@ const SPEED_MIN = 50;
 const SPEED_INCREASE_STEP = 1;
 const SPEED_BACK_TIMING = 100;
 
+const FUEL_INIT = 100;
+
+let initialPosition;
+
+
 export default function App() {
   const [score, setScore] = useState(0);
   const speed = useRef(SPEED_INIT);
-  const [fuel, setFuel] = useState(1000);
-  const [riverSegments, setRiverSegments] = useState({totalHeight: 0, river:[]}); // Store the river segments
+  const [fuel, setFuel] = useState(FUEL_INIT);
+  const [riverSegments, setRiverSegments] = useState({ totalHeight: 0, river: [] }); // Store the river segments
   const velocityRef = useRef(0); // Control smooth movement
   const animationFrame = useRef(null); // Reference to animation frame
   const [running, setRunning] = useState(true);
@@ -29,9 +34,11 @@ export default function App() {
   const [isGameRunning, setIsGameRunning] = useState(true);
   const leftBorder = useRef(0);
   const rightBorder = useRef(0);
+  const collisionHandledRef = useRef(false);
 
   const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
-  const [playerPosition, setPlayerPosition] = useState({ x: screenWidth / 2, y: screenHeight * 0.8 });
+  initialPosition = { x: screenWidth / 2, y: screenHeight * 0.8 };
+  const [playerPosition, setPlayerPosition] = useState(initialPosition);
   const memoizedStyles = useMemo(() => styles(screenWidth, screenHeight), [screenWidth, screenHeight]);
   const playerPositionRef = useRef(playerPosition);
 
@@ -47,12 +54,12 @@ export default function App() {
 
   const moveAirplane = () => {
     setPlayerPosition((prev) => {
+      if (!isGameRunning) return { x: prev.x, y: prev.y };
       const newX = prev.x + velocityRef.current;
 
       // Clamp position to the screen boundaries
       const clampedX = Math.max(AIRPLANE_WIDTH / 2, Math.min(screenWidth - AIRPLANE_WIDTH / 2, newX));
-
-      if(checkForCollision()) {
+      if (checkForCollision(clampedX)) {
         return { x: prev.x, y: prev.y };
       } else {
         Matter.Body.setPosition(entitiesRef.current.player.body, { x: clampedX, y: prev.y });
@@ -68,12 +75,12 @@ export default function App() {
     // Add logic for shooting here
   };
 
- const startMoving = (direction) => {
+  const startMoving = (direction) => {
     if (!isGameRunning) return;
 
-    if(direction === 'left') {
+    if (direction === 'left') {
       velocityRef.current = -5;
-    } else if(direction === 'right') {
+    } else if (direction === 'right') {
       velocityRef.current = 5;
     } else {
       velocityRef.current = 0;
@@ -82,9 +89,9 @@ export default function App() {
   };
 
   const startAcc = (acc) => {
-    if(acc === 'up') {
+    if (acc === 'up') {
       speed.current = speed.current >= SPEED_MAX ? SPEED_MAX : speed.current + SPEED_INCREASE_STEP;
-    } else if(acc === 'down') {
+    } else if (acc === 'down') {
       speed.current = speed.current <= SPEED_MIN ? SPEED_MIN : speed.current - SPEED_INCREASE_STEP;
     }
   };
@@ -135,6 +142,8 @@ export default function App() {
 
 
   onScrollPositionChange = (scrollPosition) => {
+    if (!isGameRunning) return;
+
     let segmentY = riverSegments.totalHeight;
 
     for (let i = 0; i < riverSegments.river.length; i++) {
@@ -147,7 +156,8 @@ export default function App() {
           (y / riverSegments.river[i].length) * (riverSegments.river[i].endWidth - riverSegments.river[i].startWidth);
         leftBorder.current = (screenWidth - widthAtY) / 2;
         rightBorder.current = leftBorder.current + widthAtY;
-        checkForCollision();
+        const currentX = playerPositionRef.current.x;
+        checkForCollision(currentX);
         break;
       } else {
         segmentY -= riverSegments.river[i].length;
@@ -155,73 +165,78 @@ export default function App() {
     }
   };
 
-  const checkForCollision = () => {
-    const currentPlayerPosition = playerPositionRef.current;
-      if (currentPlayerPosition.x < leftBorder.current + AIRPLANE_WIDTH / 2 || currentPlayerPosition.x > rightBorder.current - AIRPLANE_WIDTH / 2) {
-        handleCollision();
-        return true;
-      }
-      return false;
-  }
+  const checkForCollision = (xPosition) => {
+    if (!isGameRunning || collisionHandledRef.current) return false;
+
+    if (
+      xPosition < leftBorder.current + AIRPLANE_WIDTH / 2 ||
+      xPosition > rightBorder.current - AIRPLANE_WIDTH / 2
+    ) {
+      handleCollision();
+      return true;
+    }
+    return false;
+  };
 
   const handleCollision = () => {
-      setIsGameRunning(false); // Stop the game
+    if (collisionHandledRef.current) return; // Ensure only one collision is handled
+    collisionHandledRef.current = true; // Set flag to prevent duplicate alerts
 
-      Alert.alert(
-          "You Crashed!",
-          "Your airplane hit the borders. Restart the game?",
-          [
-              {
-                  text: "Restart",
-                  onPress: restartGame,
-              },
-              {
-                  text: "Cancel",
-                  style: "cancel",
-              },
-          ]
-      );
+    setIsGameRunning(false); // Stop the game
+
+    Alert.alert(
+      "You Crashed!",
+      "Your airplane hit the borders. Restart the game?",
+      [
+        {
+          text: "Restart",
+          onPress: restartGame,
+        }
+      ]
+    );
   };
+
   const handleFuelIsEmpty = () => {
     setIsGameRunning(false); // Stop the game
 
     Alert.alert(
-        "You Ran Out of Fuel!",
-        "Your airplane hit the borders. Restart the game?",
-        [
-            {
-                text: "Restart",
-                onPress: restartGame,
-            },
-            {
-                text: "Cancel",
-                style: "cancel",
-            },
-        ]
+      "You Ran Out of Fuel!",
+      "Your airplane hit the borders. Restart the game?",
+      [
+        {
+          text: "Restart",
+          onPress: restartGame,
+        }
+      ]
     );
-};
+  };
 
   const restartGame = () => {
-    //scrollY.current.setValue(riverSegments.totalHeight - screenHeight);
-    setFuel(100);
-    setPlayerPosition({ x: screenWidth / 2, y: entitiesRef.current.player.body.position.y });
+    collisionHandledRef.current = false; // Reset collision handling flag
     setIsGameRunning(true); // Restart the game
+    setPlayerPosition(initialPosition); // Reset the player position
+    setFuel(FUEL_INIT); // Reset fuel
   };
 
   useEffect(() => {
+    if (!isGameRunning) return; // Stop the interval when the game is not running
+
     const interval = setInterval(() => {
-      setFuel((prevFuel) => Math.max(prevFuel - 1, 0)); // Decrease fuel by 1, but not below 0
-      if(fuel === 0) {
-        handleFuelIsEmpty();
-      }
-    }, 1000); // Decrease fuel every second
+      setFuel((prevFuel) => {
+        const newFuel = Math.max(prevFuel - 1, 0); // Decrease fuel by 1, but not below 0
+        if (newFuel === 0) {
+          handleFuelIsEmpty(); // Trigger game stop when fuel reaches 0
+        }
+        return newFuel;
+      });
+    }, 1000);
 
     return () => clearInterval(interval); // Cleanup interval on component unmount
-  }, []);
+  }, [isGameRunning]);
 
 
-   useEffect(() => {
-   const interval = setInterval(() => {
+  useEffect(() => {
+    const interval = setInterval(() => {
       speed.current -= Math.sign(speed.current - SPEED_INIT);
     }, SPEED_BACK_TIMING); // Speed back to normal every tenth second
 
@@ -249,12 +264,12 @@ export default function App() {
   // Function to generate and update river segments
   useEffect(() => {
     const generateRiver = () => {
-        const segments = riverSegmentGenerator(screenWidth, RIVER_MIN_WIDTH_RATIO, RIVER_MAX_WIDTH_RATIO, screenHeight / 2, screenHeight * 5, 100, 1, 2, 3, 50);
-        setRiverSegments(segments);
+      const segments = riverSegmentGenerator(screenWidth, RIVER_MIN_WIDTH_RATIO, RIVER_MAX_WIDTH_RATIO, screenHeight / 2, screenHeight * 5, 100, 1, 2, 3, 50);
+      setRiverSegments(segments);
     };
 
     generateRiver();
-}, [screenWidth, screenHeight]);
+  }, [screenWidth, screenHeight]);
 
   const panResponder = useRef(
     PanResponder.create({
@@ -300,15 +315,15 @@ export default function App() {
         <View style={memoizedStyles.background}>
           {/* Display the scrolling background with the river segments */}
           {riverSegments.river.length === 0 ? (
-                <Text>Loading...</Text> // Show loading indicator while fetching data
-            ): (<ScrollingBackground
-              width={screenWidth}
-              height={screenHeight}
-              riverSegments={riverSegments}
-              speed={speed.current}
-              isGameRunning={isGameRunning}
-              onScrollPositionChange = {onScrollPositionChange}
-            />
+            <Text>Loading...</Text> // Show loading indicator while fetching data
+          ) : (<ScrollingBackground
+            width={screenWidth}
+            height={screenHeight}
+            riverSegments={riverSegments}
+            speed={speed.current}
+            isGameRunning={isGameRunning}
+            onScrollPositionChange={onScrollPositionChange}
+          />
           )}
 
           {/* Airplane */}

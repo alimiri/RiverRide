@@ -29,6 +29,7 @@ export default function generateRiverSegments(
     let segments = [];
     let startWidth = maxWidth;
     let endWidth;
+    let offset = 0;
 
     for (let i = 0; i < numSegments; i++) {
         const trees = [];
@@ -85,11 +86,13 @@ export default function generateRiverSegments(
 
         // Push the segment (startWidth, endWidth, length, trees)
         segments.push({
+            offset: offset,
             startWidth: startWidth,
             endWidth: endWidth,
             length: length,
             trees: trees,
         });
+        offset += length;
     }
 
     return {

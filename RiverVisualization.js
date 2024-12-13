@@ -23,14 +23,14 @@ const RiverSegment = ({ startWidth, endWidth, length, screenWidth, yOffset }) =>
 };
 
 function RiverVisualization({ width, riverSegments, treeImage }) {
-    let yOffset = 0; // To track the vertical position of the river segments
+    let yOffset = 0;
 
     const renderTrees = () => {
         let trees = [];
         riverSegments.river.forEach((segment, segmentIndex) => {
             segment.trees.forEach((tree, treeIndex) => {
-                // Calculate the absolute Y position by adding the offset of the previous segments
-                const treeY = tree.y + yOffset;
+                const treeY = tree.y + segment.offset;
+                console.log(`Tree at x: ${tree.x}, y: ${treeY} (segment offset: ${segment.offset})`);
                 trees.push(
                     <Image
                         key={`tree-${segmentIndex}-${treeIndex}`}
@@ -42,6 +42,7 @@ function RiverVisualization({ width, riverSegments, treeImage }) {
                             width: 50,
                             height: 50,
                             transform: [{ rotate: '180deg' }], // Apply 180 degree rotation
+                            zIndex: 10
                         }}
                     />
                 );
@@ -55,7 +56,7 @@ function RiverVisualization({ width, riverSegments, treeImage }) {
     };
 
     return (
-        <View style={{ width, height: riverSegments.totalHeight, flexDirection: 'column', alignItems: 'center', backgroundColor: 'transparent' }}>
+        <View style={{ width, height: riverSegments.totalHeight, flexDirection: 'column', alignItems: 'center' }}>
             {riverSegments.river.map((segment, index) => {
                 // Render each segment with its accumulated yOffset
                 const segmentYOffset = yOffset; // The offset is calculated once before rendering each segment
