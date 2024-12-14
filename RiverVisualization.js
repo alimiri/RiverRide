@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Image } from 'react-native';
 import Svg, { Polygon } from 'react-native-svg';
 
-const RiverSegment = ({ startWidth, endWidth, length, screenWidth, yOffset }) => {
+const RiverSegment = ({ startWidth, endWidth, length, screenWidth }) => {
     const startX = (screenWidth - startWidth) / 2;
     const endX = (screenWidth - endWidth) / 2;
 
@@ -13,10 +13,10 @@ const RiverSegment = ({ startWidth, endWidth, length, screenWidth, yOffset }) =>
         { x: endX, y: length },
     ];
 
-    const polygonPoints = points.map(p => `${p.x},${p.y}`).join(' ');
+    const polygonPoints = points.map((p) => `${p.x},${p.y}`).join(' ');
 
     return (
-        <Svg height={length} width={screenWidth} style={{ position: 'absolute', top: yOffset }}>
+        <Svg height={length} width={screenWidth} style={{ position: 'absolute' }}>
             <Polygon points={polygonPoints} fill="blue" />
         </Svg>
     );
@@ -57,12 +57,6 @@ function RiverVisualization({ width, riverSegments, treeImage }) {
     return (
         <View style={{ width, height: riverSegments.totalHeight, flexDirection: 'column', alignItems: 'center' }}>
             {riverSegments.river.map((segment, index) => {
-                // Render each segment with its accumulated yOffset
-                const segmentYOffset = yOffset; // The offset is calculated once before rendering each segment
-
-                // Update the yOffset after rendering the segment to keep track of the total height
-                yOffset += segment.length;
-
                 return (
                     <RiverSegment
                         key={index}
@@ -70,7 +64,6 @@ function RiverVisualization({ width, riverSegments, treeImage }) {
                         endWidth={segment.endWidth}
                         length={segment.length}
                         screenWidth={width}
-                        yOffset={segmentYOffset} // Pass the accumulated yOffset
                     />
                 );
             })}

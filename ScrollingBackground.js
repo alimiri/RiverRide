@@ -67,8 +67,8 @@ const ScrollingBackground = ({ width, height, riverSegments, speed, isGameRunnin
                     scrollPosition.current = riverSegments.totalHeight - height; // Reset to start for infinite scroll
                 }
                 setCurrentScrollY(scrollPosition.current); // Update UI
-                if (onScrollPositionChange) {
-                    onScrollPositionChange(scrollPosition.current + height); // Notify parent
+                if (onScrollPositionChange && isGameRunning) {
+                    onScrollPositionChange(scrollPosition.current); // Notify parent
                 }
             }, updateInterval); // Update every ~16ms (~60fps)
         } else {

@@ -8,7 +8,7 @@ import ScrollingBackground from './ScrollingBackground';  // Import the scrollin
 
 
 const AIRPLANE_WIDTH = 50; // Width of the airplane
-const SPEED_INIT = 1000;
+const SPEED_INIT = 100;
 const SPEED_MAX = 1500;
 const SPEED_MIN = 50;
 const SPEED_INCREASE_STEP = 1;
@@ -141,6 +141,7 @@ export default function App() {
 
 
   onScrollPositionChange = (scrollPosition) => {
+    console.log(`isGameRunning: ${isGameRunning}*************`);
     if (!isGameRunning) return;
 console.log(`scrollPosition: ${scrollPosition}`);
     for (let i = 0; i < riverSegments.river.length; i++) {
