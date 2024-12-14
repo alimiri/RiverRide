@@ -16,15 +16,13 @@ const RiverSegment = ({ startWidth, endWidth, length, screenWidth }) => {
     const polygonPoints = points.map((p) => `${p.x},${p.y}`).join(' ');
 
     return (
-        <Svg height={length} width={screenWidth} style={{ position: 'absolute' }}>
+        <Svg height={length} width={screenWidth}>
             <Polygon points={polygonPoints} fill="blue" />
         </Svg>
     );
 };
 
 function RiverVisualization({ width, riverSegments, treeImage }) {
-    let yOffset = 0;
-
     const renderTrees = () => {
         let trees = [];
         riverSegments.river.forEach((segment, segmentIndex) => {
@@ -46,9 +44,6 @@ function RiverVisualization({ width, riverSegments, treeImage }) {
                     />
                 );
             });
-
-            // After rendering trees for the current segment, update the yOffset
-            yOffset += segment.length;
         });
 
         return trees;

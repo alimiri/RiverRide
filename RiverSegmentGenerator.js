@@ -33,7 +33,7 @@ export default function generateRiverSegments(
 
     for (let i = 0; i < numSegments; i++) {
         const trees = [];
-        const nTrees = Math.round(randomTree.next() * 10); // Random number of trees
+        const nTrees = 1;//Math.round(randomTree.next() * 10); // Random number of trees
 
         // Determine segment length
         let length = minLength + Math.floor((maxLength - minLength) * randomH.next());

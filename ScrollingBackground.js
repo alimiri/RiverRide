@@ -10,6 +10,7 @@ const ScrollingBackground = ({ width, height, riverSegments, speed, isGameRunnin
     const scrollPosition = useRef(riverSegments.totalHeight - height); // Track scroll position
     const [currentScrollY, setCurrentScrollY] = useState(riverSegments.totalHeight - height); // Track UI position
     const intervalRef = useRef(null); // Reference for the scrolling interval
+    const SCROLL_INITIAL_POSITION = riverSegments.totalHeight - height;
 
     // Memoize the long river construction
     const longRiver = useMemo(() => (
@@ -55,7 +56,7 @@ const ScrollingBackground = ({ width, height, riverSegments, speed, isGameRunnin
     const prevDependencies = useRef({ isGameRunning, speed });
     useEffect(() => {
         if (!prevDependencies.current.isGameRunning && isGameRunning) {
-            scrollPosition.current = riverSegments.totalHeight - height; //reset to the first segment
+            scrollPosition.current = SCROLL_INITIAL_POSITION;
         }
 
         if (isGameRunning) {
@@ -64,7 +65,7 @@ const ScrollingBackground = ({ width, height, riverSegments, speed, isGameRunnin
                 // Calculate the new scroll position
                 scrollPosition.current -= scrollAdjustment; // Adjust based on speed
                 if (scrollPosition.current < 0 ) {
-                    scrollPosition.current = riverSegments.totalHeight - height; // Reset to start for infinite scroll
+                    scrollPosition.current = SCROLL_INITIAL_POSITION
                 }
                 setCurrentScrollY(scrollPosition.current); // Update UI
                 if (onScrollPositionChange && isGameRunning) {

@@ -78,9 +78,9 @@ export default function App() {
     if (!isGameRunning) return;
 
     if (direction === 'left') {
-      velocityRef.current = -5;
+      velocityRef.current = -1;
     } else if (direction === 'right') {
-      velocityRef.current = 5;
+      velocityRef.current = 1;
     } else {
       velocityRef.current = 0;
     }
@@ -141,24 +141,28 @@ export default function App() {
 
 
   onScrollPositionChange = (scrollPosition) => {
-    console.log(`isGameRunning: ${isGameRunning}*************`);
     if (!isGameRunning) return;
-console.log(`scrollPosition: ${scrollPosition}`);
+
+    const bottomOfRiver = riverSegments.totalHeight - scrollPosition - screenHeight;
+    const airPlaneYRelative = screenHeight - initialPosition.y + bottomOfRiver + AIRPLANE_WIDTH ;
     for (let i = 0; i < riverSegments.river.length; i++) {
-      if (riverSegments.totalHeight - riverSegments.river[i].offset < scrollPosition) {
-        const y = scrollPosition - (riverSegments.totalHeight - riverSegments.river[i].offset)
+      if (airPlaneYRelative < riverSegments.river[i].offset + riverSegments.river[i].length) {
+        const y = airPlaneYRelative - riverSegments.river[i].offset;
 
         // Calculate the width and borders of the river at the current y
         const widthAtY = riverSegments.river[i].startWidth +
           (y / riverSegments.river[i].length) * (riverSegments.river[i].endWidth - riverSegments.river[i].startWidth);
         leftBorder.current = (screenWidth - widthAtY) / 2;
         rightBorder.current = leftBorder.current + widthAtY;
+
+        //stick to the left border
+        //setPlayerPosition({x: leftBorder.current + AIRPLANE_WIDTH / 2, y: initialPosition.y});
+        //stick to the right border
+        //setPlayerPosition({x: rightBorder.current - AIRPLANE_WIDTH / 2, y: initialPosition.y});
+        //playerPositionRef.current = playerPosition;
+
         const currentX = playerPositionRef.current.x;
-        if(checkForCollision(currentX)) {
-          console.log(`totalHeight: ${riverSegments.totalHeight}, screenHeight: ${screenHeight}, scrollPosition: ${scrollPosition}`);
-          console.log(riverSegments.river.filter((segment, index) => index <= i).map((segment, index) => JSON.stringify(segment)).join());
-          console.log(`i: ${i}, riverSegments.river[i].startWidth: ${riverSegments.river[i].startWidth}, riverSegments.river[i].endWidth: ${riverSegments.river[i].endWidth}, y: ${y}, widthAtY: ${widthAtY}, leftBorder.current: ${leftBorder.current}, rightBorder.current: ${rightBorder.current}, currentX: ${currentX}`);
-        }
+        checkForCollision(currentX);
         break;
       }
     }
@@ -168,7 +172,6 @@ console.log(`scrollPosition: ${scrollPosition}`);
     if (!isGameRunning || collisionHandledRef.current) return true;
 
     if ( xPosition < leftBorder.current + AIRPLANE_WIDTH / 2 || xPosition > rightBorder.current - AIRPLANE_WIDTH / 2) {
-      console.log(`leftBorder: ${leftBorder.current}, rightBorder: ${rightBorder.current}, xPosition: ${xPosition}`);
       handleCollision();
       return true;
     }
