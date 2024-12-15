@@ -16,6 +16,10 @@ const SPEED_BACK_TIMING = 100;
 
 const FUEL_INIT = 100;
 
+const BULLET_SPEED = 5;
+const BULLET_WIDTH = 2;
+const BULLET_HEIGHT = 3;
+
 let initialPosition;
 
 export default function App() {
@@ -26,10 +30,10 @@ export default function App() {
   const velocityRef = useRef(0); // Control smooth movement
   const animationFrame = useRef(null); // Reference to animation frame
   const [running, setRunning] = useState(true);
-  const [bullets, setBullets] = useState([]); // Store bullets
+  const [bullets, setBullets] = useState([]);
   const engine = useRef(null);
   const world = useRef(null);
-  const bulletSpeed = 5; // Speed at which bullets move
+
   const [isGameRunning, setIsGameRunning] = useState(true);
   const leftBorder = useRef(0);
   const rightBorder = useRef(0);
@@ -69,10 +73,71 @@ export default function App() {
     animationFrame.current = requestAnimationFrame(moveAirplane);
   };
 
-  const handleShoot = () => {
-    console.log('Shoot action!');
-    // Add logic for shooting here
+  const [isShooting, setIsShooting] = useState(false);
+  const [shootInterval, setShootInterval] = useState(null);
+
+  const onPressIn = () => {
+    setIsShooting(true);
+    handleShoot(); // Shoot immediately on press
   };
+
+  const onPressOut = () => {
+    setIsShooting(false);
+    clearInterval(shootInterval);  // Stop shooting when the button is released
+  };
+
+  useEffect(() => {
+    let interval;
+
+    if (isShooting) {
+      if (!shootInterval) {
+        interval = setInterval(() => {
+          handleShoot();
+        }, 100);
+
+        setShootInterval(interval);  // Save the interval ID to stop it later
+      }
+    } else {
+      if (shootInterval) {
+        clearInterval(shootInterval); // Stop the shooting interval when not pressing
+        setShootInterval(null);  // Ensure the interval ID is cleared
+      }
+    }
+
+    return () => {
+      clearInterval(interval);  // Cleanup on unmount
+    };
+  }, [isShooting]);  // Only depend on `isShooting`
+
+
+  const handleShoot = () => {
+    if (!world.current) {
+      console.error('Matter.js world is not defined!');
+      return;
+    }
+    // Create the bullet
+    const bullet = Matter.Bodies.rectangle(
+      playerPositionRef.current.x,
+      playerPositionRef.current.y,
+      BULLET_WIDTH,
+      BULLET_HEIGHT,
+      {
+        isStatic: false,
+        render: { fillStyle: 'red' },
+      }
+    );
+
+    // Try adding the bullet to the Matter.js world
+    try {
+      Matter.World.add(world.current, [bullet]);
+    } catch (error) {
+      console.error('Error adding bullet to Matter.js world:', error);
+    }
+
+    // Update the bullets state
+    setBullets((prevBullets) => [...prevBullets, bullet]);
+  };
+
 
   const startMoving = (direction) => {
     if (!isGameRunning) return;
@@ -104,47 +169,33 @@ export default function App() {
   };
 
   const setupWorld = () => {
-    const engine = Matter.Engine.create();
-    const world = engine.world;
+    engine.current = Matter.Engine.create();
+    world.current = engine.current.world;
 
-    engine.gravity.y = 0;
+    engine.current.gravity.y = 0;
+
     const playerX = screenWidth / 2;
     const playerY = screenHeight * 0.8;
 
     // Create player airplane body
     const player = Matter.Bodies.rectangle(playerX, playerY, 50, 50);
-    Matter.World.add(world, [player]);
+    Matter.World.add(world.current, [player]);
 
     entitiesRef.current = {
-      physics: { engine, world },
+      physics: { engine: engine.current, world: world.current },
       player: { body: player, size: [50, 50], color: "blue", renderer: AirplaneImage },
       screenWidth,
       screenHeight,
     };
 
-    return entitiesRef.current;  // Return ref object
+    return entitiesRef.current;
   };
-
-  const shootBullet = () => {
-    if (!entitiesRef.current) return; // Prevent error if entitiesRef is null
-
-    const playerBody = entitiesRef.current.player.body;
-
-    const bullet = Matter.Bodies.rectangle(playerBody.position.x, playerBody.position.y - 25, 10, 20, {
-      isStatic: false,
-      render: { fillStyle: 'red' }
-    });
-
-    Matter.World.add(world.current, [bullet]);
-    setBullets((prevBullets) => [...prevBullets, bullet]); // Add bullet to state
-  };
-
 
   onScrollPositionChange = (scrollPosition) => {
     if (!isGameRunning) return;
 
     const bottomOfRiver = riverSegments.totalHeight - scrollPosition - screenHeight;
-    const airPlaneYRelative = screenHeight - initialPosition.y + bottomOfRiver + AIRPLANE_WIDTH ;
+    const airPlaneYRelative = screenHeight - initialPosition.y + bottomOfRiver + AIRPLANE_WIDTH;
     for (let i = 0; i < riverSegments.river.length; i++) {
       if (airPlaneYRelative < riverSegments.river[i].offset + riverSegments.river[i].length) {
         const y = airPlaneYRelative - riverSegments.river[i].offset;
@@ -171,7 +222,7 @@ export default function App() {
   const checkForCollision = (xPosition) => {
     if (!isGameRunning || collisionHandledRef.current) return true;
 
-    if ( xPosition < leftBorder.current + AIRPLANE_WIDTH / 2 || xPosition > rightBorder.current - AIRPLANE_WIDTH / 2) {
+    if (xPosition < leftBorder.current + AIRPLANE_WIDTH / 2 || xPosition > rightBorder.current - AIRPLANE_WIDTH / 2) {
       handleCollision();
       return true;
     }
@@ -251,7 +302,7 @@ export default function App() {
         setBullets((prevBullets) => {
           return prevBullets
             .map((bullet) => {
-              Matter.Body.translate(bullet, { x: 0, y: -bulletSpeed });
+              Matter.Body.translate(bullet, { x: 0, y: -BULLET_SPEED });
               return bullet;
             })
             .filter((bullet) => bullet.position.y > 0); // Remove bullets that move off screen
@@ -326,33 +377,29 @@ export default function App() {
             onScrollPositionChange={onScrollPositionChange}
           />
           )}
-
-          {/* Airplane */}
           <Image
-            source={require('./assets/airplane.png')} // Replace with your airplane image
+            source={require('./assets/airplane.png')}
             style={[memoizedStyles.airplane, { left: playerPosition.x - AIRPLANE_WIDTH / 2 }]}
           />
-
-          {/* Render river segments */}
-          {riverSegments.river.map((segment, index) => (
-            <View
+          {bullets.map((bullet, index) => {
+            return (<View
               key={index}
               style={{
                 position: 'absolute',
-                top: segment.y,
-                left: segment.x,
-                width: segment.width,
-                height: segment.height,
-                backgroundColor: 'blue', // Customize river color
+                left: bullet.position.x,
+                top: bullet.position.y - 150,
+                width: BULLET_WIDTH,
+                height: BULLET_HEIGHT,
+                backgroundColor: 'red',
               }}
             />
-          ))}
+          );})}
         </View>
 
         {/* Bottom Controls Strip */}
         <View style={memoizedStyles.controlsStrip}>
           {/* Left: Shoot Button */}
-          <TouchableOpacity style={memoizedStyles.shootArea} onPress={handleShoot}>
+          <TouchableOpacity style={memoizedStyles.shootArea} onPressIn={onPressIn} onPressOut={onPressOut}>
             <Text style={memoizedStyles.controlText}>Shoot</Text>
           </TouchableOpacity>
 
