@@ -1,43 +1,60 @@
-import React, { useRef, useEffect, useState  } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 
-const MovementArea = ({ onTapLeft, onTapRight, onTapMiddle, onHoldLeft, onHoldRight, onHoldMiddle,
-                        onTapUp, onTapDown, onTapNoAcc, onHoldUp, onHoldDown, onHoldNoAcc,
-                        onStop }) => {
+const MovementArea = ({
+  onTapLeft, onTapRight, onTapMiddle,
+  onHoldLeft, onHoldRight, onHoldMiddle,
+  onTapUp, onTapDown, onTapNoAcc,
+  onHoldUp, onHoldDown, onHoldNoAcc, onStop
+}) => {
   const [areaDimensions, setAreaDimensions] = useState({ areaWidth: 0, areaHeight: 0 });
   const intervalRef = useRef(null);
   const currentArea = useRef(null);
-
   const currentAcc = useRef(null);
   const intervalAccRef = useRef(null);
 
-  const handleTouchStart = (event) => {
-    const { locationX, locationY } = event.nativeEvent;
-    const { areaWidth, areaHeight } = areaDimensions;
-
+  // Function to determine the area based on touch position
+  const getArea = (locationX, locationY, areaWidth, areaHeight) => {
     const isLeft = locationX < areaWidth / 3;
     const isRight = locationX > areaWidth * 2 / 3;
     const isUpAcc = locationY < areaHeight / 3;
     const isDownAcc = locationY > areaHeight * 2 / 3;
 
+    return { isLeft, isRight, isUpAcc, isDownAcc };
+  };
+
+  const handleTouchStart = (event) => {
+    const { locationX, locationY } = event.nativeEvent;
+    const { areaWidth, areaHeight } = areaDimensions;
+
+    const { isLeft, isRight, isUpAcc, isDownAcc } = getArea(locationX, locationY, areaWidth, areaHeight);
+
     if (isLeft) {
       currentArea.current = 'left';
       onTapLeft();
-      intervalRef.current = setInterval(onHoldLeft, 100); // Trigger every 100ms
+      intervalRef.current = setInterval(onHoldLeft, 100);
     } else if (isRight) {
       currentArea.current = 'right';
       onTapRight();
       intervalRef.current = setInterval(onHoldRight, 100);
+    } else {
+      currentArea.current = 'still';
+      onTapMiddle();
+      intervalRef.current = setInterval(onHoldMiddle, 100);
     }
 
     if (isUpAcc) {
       currentAcc.current = 'up';
       onTapUp();
-      intervalAccRef.current = setInterval(onHoldUp, 100); // Trigger every 100ms
+      intervalAccRef.current = setInterval(onHoldUp, 30);
     } else if (isDownAcc) {
       currentAcc.current = 'down';
       onTapDown();
-      intervalAccRef.current = setInterval(onHoldDown, 100);
+      intervalAccRef.current = setInterval(onHoldDown, 30);
+    } else {
+      currentAcc.current = 'noAcc';
+      onTapNoAcc();
+      intervalAccRef.current = setInterval(onHoldNoAcc, 30);
     }
   };
 
@@ -45,11 +62,9 @@ const MovementArea = ({ onTapLeft, onTapRight, onTapMiddle, onHoldLeft, onHoldRi
     const { locationX, locationY } = event.nativeEvent;
     const { areaWidth, areaHeight } = areaDimensions;
 
-    const isLeft = locationX < areaWidth / 3;
-    const isRight = locationX > areaWidth * 2 / 3;
-    const isUpAcc = locationY < areaHeight / 3;
-    const isDownAcc = locationY > areaHeight * 2 / 3;
+    const { isLeft, isRight, isUpAcc, isDownAcc } = getArea(locationX, locationY, areaWidth, areaHeight);
 
+    // Handle touch area transitions
     if (isLeft && currentArea.current !== 'left') {
       currentArea.current = 'left';
       clearInterval(intervalRef.current);
@@ -86,12 +101,12 @@ const MovementArea = ({ onTapLeft, onTapRight, onTapMiddle, onHoldLeft, onHoldRi
   };
 
   const handleTouchEnd = () => {
+    // Clear intervals and reset state when touch ends
     clearInterval(intervalRef.current);
-    intervalRef.current = null;
-    currentArea.current = null;
-
     clearInterval(intervalAccRef.current);
+    intervalRef.current = null;
     intervalAccRef.current = null;
+    currentArea.current = null;
     currentAcc.current = null;
 
     onStop(); // Stop airplane movement

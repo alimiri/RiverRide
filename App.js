@@ -5,6 +5,7 @@ import MovementArea from './MovementArea'; // Import the new MovementArea
 import { PanResponder } from 'react-native';
 import riverSegmentGenerator from './RiverSegmentGenerator'; // Import the riverSegmentGenerator
 import ScrollingBackground from './ScrollingBackground';  // Import the scrolling background
+import ShootButton from './ShootButton';
 
 
 const AIRPLANE_WIDTH = 50; // Width of the airplane
@@ -72,43 +73,6 @@ export default function App() {
 
     animationFrame.current = requestAnimationFrame(moveAirplane);
   };
-
-  const [isShooting, setIsShooting] = useState(false);
-  const [shootInterval, setShootInterval] = useState(null);
-
-  const onPressIn = () => {
-    setIsShooting(true);
-    handleShoot(); // Shoot immediately on press
-  };
-
-  const onPressOut = () => {
-    setIsShooting(false);
-    clearInterval(shootInterval);  // Stop shooting when the button is released
-  };
-
-  useEffect(() => {
-    let interval;
-
-    if (isShooting) {
-      if (!shootInterval) {
-        interval = setInterval(() => {
-          handleShoot();
-        }, 100);
-
-        setShootInterval(interval);  // Save the interval ID to stop it later
-      }
-    } else {
-      if (shootInterval) {
-        clearInterval(shootInterval); // Stop the shooting interval when not pressing
-        setShootInterval(null);  // Ensure the interval ID is cleared
-      }
-    }
-
-    return () => {
-      clearInterval(interval);  // Cleanup on unmount
-    };
-  }, [isShooting]);  // Only depend on `isShooting`
-
 
   const handleShoot = () => {
     if (!world.current) {
@@ -363,7 +327,6 @@ export default function App() {
           <Text style={memoizedStyles.infoText}>Fuel: {fuel}</Text>
         </View>
 
-        {/* Background Area */}
         <View style={memoizedStyles.background}>
           {/* Display the scrolling background with the river segments */}
           {riverSegments.river.length === 0 ? (
@@ -393,15 +356,13 @@ export default function App() {
                 backgroundColor: 'red',
               }}
             />
-          );})}
+            );
+          })}
         </View>
 
         {/* Bottom Controls Strip */}
         <View style={memoizedStyles.controlsStrip}>
-          {/* Left: Shoot Button */}
-          <TouchableOpacity style={memoizedStyles.shootArea} onPressIn={onPressIn} onPressOut={onPressOut}>
-            <Text style={memoizedStyles.controlText}>Shoot</Text>
-          </TouchableOpacity>
+          <ShootButton onShoot={handleShoot} />
 
           {/* Right: Movement Area */}
           <MovementArea
