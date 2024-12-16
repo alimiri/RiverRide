@@ -8,7 +8,7 @@ import ShootButton from './ShootButton';
 
 
 const AIRPLANE_WIDTH = 50; // Width of the airplane
-const SPEED_INIT = 100;
+const SPEED_INIT = 1000;
 const SPEED_MAX = 1500;
 const SPEED_MIN = 50;
 const SPEED_INCREASE_STEP = 1;
@@ -275,7 +275,7 @@ export default function App() {
   // Function to generate and update river segments
   useEffect(() => {
     const generateRiver = () => {
-      const segments = riverSegmentGenerator(screenWidth, RIVER_MIN_WIDTH_RATIO, RIVER_MAX_WIDTH_RATIO, screenHeight / 2, screenHeight * 5, 100, 1, 2, 3, 50);
+      const segments = riverSegmentGenerator(screenWidth, RIVER_MIN_WIDTH_RATIO, RIVER_MAX_WIDTH_RATIO, screenHeight / 2, screenHeight * 5, 100, 50, {seedW: 1, seedH: 2, seedTree: 3, seedBridge: 1, seedHelicopter: 10});
       setRiverSegments(segments);
     };
 

@@ -1,8 +1,8 @@
 import React from 'react';
 import { View, Image } from 'react-native';
-import Svg, { Polygon } from 'react-native-svg';
+import Svg, { Polygon, Rect } from 'react-native-svg';
 
-const RiverSegment = ({ startWidth, endWidth, length, screenWidth }) => {
+const RiverSegment = ({ startWidth, endWidth, length, screenWidth, bridges }) => {
     const startX = (screenWidth - startWidth) / 2;
     const endX = (screenWidth - endWidth) / 2;
 
@@ -23,6 +23,35 @@ const RiverSegment = ({ startWidth, endWidth, length, screenWidth }) => {
 };
 
 function RiverVisualization({ width, riverSegments, treeImage }) {
+    const renderBridges = () => {
+        let bridges = [];
+        riverSegments.river.forEach((segment, segmentIndex) => {
+            segment.bridges.forEach((bridge, bridgeIndex) => {
+                const y = bridge.y1 + segment.offset;
+                const height = bridge.y2 - bridge.y1; // Correct calculation for height
+                const x = bridge.x1;
+                const width = bridge.x2 - bridge.x1; // Correct calculation for width
+                console.log(x, y, width, height); // Log for debugging
+
+                bridges.push(
+                    <View
+                        key={`bridge-${segmentIndex}-${bridgeIndex}`}
+                        style={{
+                            position: 'absolute',
+                            left: x,
+                            top: y,
+                            width: width,
+                            height: height,
+                            backgroundColor: 'brown', // Use `backgroundColor` instead of `fill`
+                            zIndex: 100,
+                        }}
+                    />
+                );
+            });
+        });
+        return bridges;
+    };
+
     const renderTrees = () => {
         let trees = [];
         riverSegments.river.forEach((segment, segmentIndex) => {
@@ -39,7 +68,6 @@ function RiverVisualization({ width, riverSegments, treeImage }) {
                             width: 50,
                             height: 50,
                             transform: [{ rotate: '180deg' }], // Apply 180 degree rotation
-                            zIndex: 10
                         }}
                     />
                 );
@@ -59,10 +87,12 @@ function RiverVisualization({ width, riverSegments, treeImage }) {
                         endWidth={segment.endWidth}
                         length={segment.length}
                         screenWidth={width}
+                        bridges={segment.bridges}
                     />
                 );
             })}
             {renderTrees()}
+            {renderBridges()}
         </View>
     );
 }

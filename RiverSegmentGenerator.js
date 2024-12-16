@@ -17,11 +17,10 @@ export default function generateRiverSegments(
     minLength,
     maxLength,
     numSegments,
-    seedW,
-    seedH,
-    seedTree,
-    treeWidth
+    treeWidth,
+    seeds,
 ) {
+    const {seedW, seedH, seedTree, seedBridge, seedHelicopter} = seeds;
     const randomW = new SeededRandom(seedW); // Seeded RNG for width
     const randomH = new SeededRandom(seedH); // Seeded RNG for length
     const randomTree = new SeededRandom(seedTree); // Seeded RNG for trees
@@ -84,6 +83,9 @@ export default function generateRiverSegments(
             trees.push({ x, y });
         }
 
+        const bridges = [{x1: (screenWidth - startWidth) / 2, y1: length / 2 - 100, x2: screenWidth - (screenWidth - startWidth) / 2, y2: length / 2 + 100}];
+        const helicopters = [{startX: 100, y: 100, direction: 'ltr'}];
+
         // Push the segment (startWidth, endWidth, length, trees)
         segments.push({
             offset: offset,
@@ -91,6 +93,8 @@ export default function generateRiverSegments(
             endWidth: endWidth,
             length: length,
             trees: trees,
+            bridges: bridges,
+            helicopters: helicopters,
         });
         offset += length;
     }
