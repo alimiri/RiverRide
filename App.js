@@ -2,7 +2,6 @@ import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { View, Text, Dimensions, Image, Alert } from 'react-native';
 import Matter from 'matter-js';
 import MovementArea from './MovementArea'; // Import the new MovementArea
-import { PanResponder } from 'react-native';
 import riverSegmentGenerator from './RiverSegmentGenerator'; // Import the riverSegmentGenerator
 import ScrollingBackground from './ScrollingBackground';  // Import the scrolling background
 import ShootButton from './ShootButton';
@@ -30,7 +29,6 @@ export default function App() {
   const [riverSegments, setRiverSegments] = useState({ totalHeight: 0, river: [] }); // Store the river segments
   const velocityRef = useRef(0); // Control smooth movement
   const animationFrame = useRef(null); // Reference to animation frame
-  const [running, setRunning] = useState(true);
   const [bullets, setBullets] = useState([]);
   const engine = useRef(null);
   const world = useRef(null);
@@ -51,7 +49,6 @@ export default function App() {
 
   const entitiesRef = useRef(null);  // Ref to store entities
 
-  // Update the ref whenever playerPosition changes
   useEffect(() => {
     playerPositionRef.current = playerPosition;
   }, [playerPosition]);
@@ -101,7 +98,6 @@ export default function App() {
     // Update the bullets state
     setBullets((prevBullets) => [...prevBullets, bullet]);
   };
-
 
   const startMoving = (direction) => {
     if (!isGameRunning) return;
@@ -286,34 +282,7 @@ export default function App() {
     generateRiver();
   }, [screenWidth, screenHeight]);
 
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: (e, gestureState) => {
-        initialTouch.current = { x: gestureState.x0, y: gestureState.y0 };
-        lastTouch.current = initialTouch.current;
-      },
-      onPanResponderMove: (e, gestureState) => {
-        const deltaX = gestureState.moveX - lastTouch.current.x;
-
-        let newX = entitiesRef.current.player.body.position.x + deltaX;
-
-        // Clamp within screen boundaries
-        const halfWidth = entitiesRef.current.player.size[0] / 2;
-        if (newX < halfWidth) newX = halfWidth;
-        if (newX > screenWidth - halfWidth) newX = screenWidth - halfWidth;
-
-        Matter.Body.setPosition(entitiesRef.current.player.body, { x: newX, y: entitiesRef.current.player.body.position.y });
-
-        setPlayerPosition({ x: newX, y: entitiesRef.current.player.body.position.y });
-
-        lastTouch.current = { x: gestureState.moveX, y: gestureState.moveY };
-      },
-    })
-  ).current;
-
-  const entities = useRef(setupWorld()).current;
+  useRef(setupWorld()).current;
 
   return (
     <View style={{ flex: 1, position: 'relative' }}>
