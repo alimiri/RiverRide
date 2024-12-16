@@ -105,7 +105,6 @@ export default function App() {
 
   const startMoving = (direction) => {
     if (!isGameRunning) return;
-
     if (direction === 'left') {
       velocityRef.current = -1;
     } else if (direction === 'right') {
@@ -366,20 +365,8 @@ export default function App() {
 
           {/* Right: Movement Area */}
           <MovementArea
-            onTapLeft={() => startMoving('left')}
-            onTapRight={() => startMoving('right')}
-            onTapMiddle={() => startMoving('still')}
-            onHoldLeft={() => startMoving('left')}
-            onHoldRight={() => startMoving('right')}
-            onHoldMiddle={() => startMoving('still')}
-
-            onTapUp={() => startAcc('up')}
-            onTapDown={() => startAcc('down')}
-            onTapNoAcc={() => startAcc('noAcc')}
-            onHoldUp={() => startAcc('up')}
-            onHoldDown={() => startAcc('down')}
-            onHoldNoAcc={() => startAcc('noAcc')}
-
+            onTap={(dir) => ['left', 'right', 'still'].includes(dir) ? startMoving(dir) : startAcc(dir)}
+            onHold={(dir) => ['left', 'right', 'still'].includes(dir) ? startMoving(dir) : startAcc(dir)}
             onStop={stopMoving}
           />
         </View>

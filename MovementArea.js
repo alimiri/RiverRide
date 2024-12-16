@@ -1,126 +1,67 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { View, StyleSheet, Text } from 'react-native';
 
-const MovementArea = ({
-  onTapLeft, onTapRight, onTapMiddle,
-  onHoldLeft, onHoldRight, onHoldMiddle,
-  onTapUp, onTapDown, onTapNoAcc,
-  onHoldUp, onHoldDown, onHoldNoAcc, onStop
-}) => {
-  const [areaDimensions, setAreaDimensions] = useState({ areaWidth: 0, areaHeight: 0 });
+const MovementArea = ({ onTap, onHold, onStop }) => {
+  const [areaDimensions, setAreaDimensions] = useState({ areaWidth: 0, areaHeight: 0, offsetX: 0, offsetY: 0 });
   const intervalRef = useRef(null);
   const currentArea = useRef(null);
   const currentAcc = useRef(null);
   const intervalAccRef = useRef(null);
-  const activeTouchRef = useRef(null);
 
-  // Function to determine the area based on touch position
-  const getSections = (locationX, locationY, areaWidth, areaHeight) => {
-    const isLeft = locationX < areaWidth / 3;
-    const isRight = locationX > areaWidth * 2 / 3;
-    const isUpAcc = locationY < areaHeight / 3;
-    const isDownAcc = locationY > areaHeight * 2 / 3;
+  const getSections = (nativeEvent) => {
+    const { pageX, pageY } = nativeEvent;
+    const { areaWidth, areaHeight, offsetX, offsetY } = areaDimensions;
 
-    return { isLeft, isRight, isUpAcc, isDownAcc };
+    const locationX = pageX - offsetX;
+    const locationY = pageY - offsetY;
+
+    const sections = {move: 'still', acc: 'noAcc'};
+    if(locationX < areaWidth / 3) {
+      sections.move =  'left';
+    }
+    if(locationX > areaWidth * 2 / 3) {
+      sections.move = 'right';
+    }
+    if(locationY < areaHeight / 3) {
+      sections.acc = 'up';
+    }
+    if(locationY > areaHeight * 2 / 3) {
+      sections.acc = 'down';
+    }
+    return sections;
   };
 
   const handleTouchStart = (event) => {
-    const { locationX, locationY } = event.nativeEvent;
-    const { areaWidth, areaHeight } = areaDimensions;
+    const { move, acc } = getSections(event.nativeEvent);
 
-    const touch = event.nativeEvent;
-    activeTouchRef.current = touch.identifier; // Save the identifier
+    currentArea.current = move;
+    onTap(move); // Call onTap directly, not bind
+    intervalRef.current = setInterval(() => onHold(move), 100);
 
-    console.log('Touch Start ID:', touch.identifier);
-
-    const { isLeft, isRight, isUpAcc, isDownAcc } = getSections(locationX, locationY, areaWidth, areaHeight);
-
-    if (isLeft) {
-      currentArea.current = 'left';
-      onTapLeft();
-      intervalRef.current = setInterval(onHoldLeft, 100);
-    } else if (isRight) {
-      currentArea.current = 'right';
-      onTapRight();
-      intervalRef.current = setInterval(onHoldRight, 100);
-    } else {
-      currentArea.current = 'still';
-      onTapMiddle();
-      intervalRef.current = setInterval(onHoldMiddle, 100);
-    }
-
-    if (isUpAcc) {
-      currentAcc.current = 'up';
-      onTapUp();
-      intervalAccRef.current = setInterval(onHoldUp, 30);
-    } else if (isDownAcc) {
-      currentAcc.current = 'down';
-      onTapDown();
-      intervalAccRef.current = setInterval(onHoldDown, 30);
-    } else {
-      currentAcc.current = 'noAcc';
-      onTapNoAcc();
-      intervalAccRef.current = setInterval(onHoldNoAcc, 30);
-    }
+    currentAcc.current = acc;
+    onTap(acc); // Call onTap directly, not bind
+    intervalAccRef.current = setInterval(() => onHold(acc), 30);
   };
 
   const handleTouchMove = (event) => {
-    const touch = event.nativeEvent;
-    if(activeTouchRef.current !== touch.identifier)
-    {
-      console.log(`Move, not my touch: ${touch.identifier} expexted: ${activeTouchRef.current}`);
-      return;
+    const { move, acc } = getSections(event.nativeEvent);
+
+    if (currentArea.current !== move) {
+      currentArea.current = move;
+      clearInterval(intervalRef.current);
+      onTap(move); // Call onTap directly, not bind
+      intervalRef.current = setInterval(() => onHold(move), 100);
     }
 
-    const { locationX, locationY } = touch;
-    const { areaWidth, areaHeight } = areaDimensions;
-
-    const { isLeft, isRight, isUpAcc, isDownAcc } = getSections(locationX, locationY, areaWidth, areaHeight);
-
-    // Handle touch area transitions
-    if (isLeft && currentArea.current !== 'left') {
-      currentArea.current = 'left';
-      clearInterval(intervalRef.current);
-      onTapLeft();
-      intervalRef.current = setInterval(onHoldLeft, 100);
-    } else if (isRight && currentArea.current !== 'right') {
-      currentArea.current = 'right';
-      clearInterval(intervalRef.current);
-      onTapRight();
-      intervalRef.current = setInterval(onHoldRight, 100);
-    } else if (!isRight && !isLeft && currentArea.current !== 'still') {
-      currentArea.current = 'still';
-      clearInterval(intervalRef.current);
-      onTapMiddle();
-      intervalRef.current = setInterval(onHoldMiddle, 100);
-    }
-
-    if (isUpAcc && currentAcc.current !== 'up') {
-      currentAcc.current = 'up';
+    if (currentAcc.current !== acc) {
+      currentAcc.current = acc;
       clearInterval(intervalAccRef.current);
-      onTapUp();
-      intervalAccRef.current = setInterval(onHoldUp, 30);
-    } else if (isDownAcc && currentAcc.current !== 'down') {
-      currentAcc.current = 'down';
-      clearInterval(intervalAccRef.current);
-      onTapDown();
-      intervalAccRef.current = setInterval(onHoldDown, 30);
-    } else if (!isUpAcc && !isDownAcc && currentAcc.current !== 'noAcc') {
-      currentAcc.current = 'noAcc';
-      clearInterval(intervalAccRef.current);
-      onTapNoAcc();
-      intervalAccRef.current = setInterval(onHoldNoAcc, 30);
+      onTap(acc); // Call onTap directly, not bind
+      intervalAccRef.current = setInterval(() => onHold(acc), 30);
     }
   };
 
   const handleTouchEnd = (event) => {
-    const touch = event.nativeEvent;
-    if(activeTouchRef.current !== touch.identifier)
-    {
-      console.log(`Touch end, not my touch: ${touch.identifier} expexted: ${activeTouchRef.current}`);
-      return;
-    }
-
     clearInterval(intervalRef.current);
     clearInterval(intervalAccRef.current);
     intervalRef.current = null;
@@ -138,27 +79,49 @@ const MovementArea = ({
     };
   }, []);
 
-  const onLayout = (event) => {
-    const { width, height } = event.nativeEvent.layout;
-    console.log('Area dimensions:', width, height);
-    setAreaDimensions({ areaWidth: width, areaHeight: height });
-  };
+  useEffect(() => {
+    if (currentArea.current) {
+      currentArea.current.measure((x, y, width, height, pageX, pageY) => {
+        setAreaDimensions({ areaWidth: width, areaHeight: height, offsetX: pageX, offsetY: pageY });
+      });
+    }
+  }, []);
 
+  const getAreaText = (row, col) => {
+    if(row === 0 && col === 0) {
+      return 'FAST LEFT';
+    } else if(row === 0 && col === 1) {
+      return 'FAST';
+    } else if(row === 0 && col === 2) {
+      return 'FAST RIGHT';
+    } else if(row === 1 && col === 0) {
+      return 'LEFT';
+    } else if (row === 1 && col === 2) {
+      return 'RIGHT';
+    } else if(row === 2 && col === 0) {
+      return 'SLOW LEFT';
+    } else if(row === 2 && col === 1) {
+      return 'SLOW';
+    }else if(row === 2 && col === 2) {
+      return 'SLOW RIGHT';
+    }
+    return '';
+  };
   return (
     <View
       style={styles.movementArea}
-      onLayout={onLayout}
       onStartShouldSetResponder={() => true}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
       onTouchCancel={handleTouchEnd}
+      ref={currentArea}
     >
     {Array.from({ length: 3 }).map((_, row) => (
       <View key={`row-${row}`} style={styles.row}>
         {Array.from({ length: 3 }).map((_, col) => (
           <View key={`col-${col}`} style={styles.cell}>
-            <Text style={styles.cellText}>{`(${row + 1}, ${col + 1})`}</Text>
+            <Text style={styles.cellText}>{getAreaText(row, col)}</Text>
           </View>
         ))}
       </View>

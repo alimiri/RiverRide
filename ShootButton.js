@@ -1,32 +1,18 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 
 const ShootButton = ({ onShoot }) => {
   const [isShooting, setIsShooting] = useState(false);
-  const activeTouchRef = useRef(null);
 
-  const handleTouchStart = (event) => {
-    const touch = event.nativeEvent;
-    activeTouchRef.current = touch.identifier; // Save the identifier
-
-    console.log('Press In ID:', touch.identifier);
-
+  const handleTouchStart = () => {
     setIsShooting(true);
-    onShoot(); // Shoot immediately on press
+    onShoot();
   };
 
-  const handleTouchEnd = (event) => {
-    const touch = event.nativeEvent;
-    if(activeTouchRef.current !== touch.identifier)
-    {
-      console.log(`Press Out, not my touch: ${touch.identifier} expexted: ${activeTouchRef.current}`);
-      return;
-    }
-    console.log('Press Out ID:', touch.identifier);
+  const handleTouchEnd = () => {
     setIsShooting(false);
   };
 
-  // Continuous shooting logic
   useEffect(() => {
     let interval;
     if (isShooting) {
