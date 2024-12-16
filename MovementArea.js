@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, Text } from 'react-native';
 
 const MovementArea = ({
   onTapLeft, onTapRight, onTapMiddle,
@@ -12,9 +12,10 @@ const MovementArea = ({
   const currentArea = useRef(null);
   const currentAcc = useRef(null);
   const intervalAccRef = useRef(null);
+  const activeTouchRef = useRef(null);
 
   // Function to determine the area based on touch position
-  const getArea = (locationX, locationY, areaWidth, areaHeight) => {
+  const getSections = (locationX, locationY, areaWidth, areaHeight) => {
     const isLeft = locationX < areaWidth / 3;
     const isRight = locationX > areaWidth * 2 / 3;
     const isUpAcc = locationY < areaHeight / 3;
@@ -27,7 +28,12 @@ const MovementArea = ({
     const { locationX, locationY } = event.nativeEvent;
     const { areaWidth, areaHeight } = areaDimensions;
 
-    const { isLeft, isRight, isUpAcc, isDownAcc } = getArea(locationX, locationY, areaWidth, areaHeight);
+    const touch = event.nativeEvent;
+    activeTouchRef.current = touch.identifier; // Save the identifier
+
+    console.log('Touch Start ID:', touch.identifier);
+
+    const { isLeft, isRight, isUpAcc, isDownAcc } = getSections(locationX, locationY, areaWidth, areaHeight);
 
     if (isLeft) {
       currentArea.current = 'left';
@@ -59,10 +65,17 @@ const MovementArea = ({
   };
 
   const handleTouchMove = (event) => {
-    const { locationX, locationY } = event.nativeEvent;
+    const touch = event.nativeEvent;
+    if(activeTouchRef.current !== touch.identifier)
+    {
+      console.log(`Move, not my touch: ${touch.identifier} expexted: ${activeTouchRef.current}`);
+      return;
+    }
+
+    const { locationX, locationY } = touch;
     const { areaWidth, areaHeight } = areaDimensions;
 
-    const { isLeft, isRight, isUpAcc, isDownAcc } = getArea(locationX, locationY, areaWidth, areaHeight);
+    const { isLeft, isRight, isUpAcc, isDownAcc } = getSections(locationX, locationY, areaWidth, areaHeight);
 
     // Handle touch area transitions
     if (isLeft && currentArea.current !== 'left') {
@@ -100,8 +113,14 @@ const MovementArea = ({
     }
   };
 
-  const handleTouchEnd = () => {
-    // Clear intervals and reset state when touch ends
+  const handleTouchEnd = (event) => {
+    const touch = event.nativeEvent;
+    if(activeTouchRef.current !== touch.identifier)
+    {
+      console.log(`Touch end, not my touch: ${touch.identifier} expexted: ${activeTouchRef.current}`);
+      return;
+    }
+
     clearInterval(intervalRef.current);
     clearInterval(intervalAccRef.current);
     intervalRef.current = null;
@@ -121,6 +140,7 @@ const MovementArea = ({
 
   const onLayout = (event) => {
     const { width, height } = event.nativeEvent.layout;
+    console.log('Area dimensions:', width, height);
     setAreaDimensions({ areaWidth: width, areaHeight: height });
   };
 
@@ -129,11 +149,21 @@ const MovementArea = ({
       style={styles.movementArea}
       onLayout={onLayout}
       onStartShouldSetResponder={() => true}
-      onResponderGrant={handleTouchStart}
-      onResponderMove={handleTouchMove}
-      onResponderRelease={handleTouchEnd}
-      onResponderTerminate={handleTouchEnd}
-    />
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onTouchCancel={handleTouchEnd}
+    >
+    {Array.from({ length: 3 }).map((_, row) => (
+      <View key={`row-${row}`} style={styles.row}>
+        {Array.from({ length: 3 }).map((_, col) => (
+          <View key={`col-${col}`} style={styles.cell}>
+            <Text style={styles.cellText}>{`(${row + 1}, ${col + 1})`}</Text>
+          </View>
+        ))}
+      </View>
+    ))}
+    </View>
   );
 };
 
@@ -141,6 +171,21 @@ const styles = StyleSheet.create({
   movementArea: {
     flex: 2,
     backgroundColor: '#005500', // Green for testing
+  },
+  row: {
+    flex: 1,
+    flexDirection: 'row',
+  },
+  cell: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: 'black', // Adjust for visibility
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cellText: {
+    color: 'black',
+    fontWeight: 'bold',
   },
 });
 

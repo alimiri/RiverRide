@@ -1,17 +1,28 @@
-import React, { useState, useEffect } from 'react';
-import { TouchableOpacity, Text, StyleSheet } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet } from 'react-native';
 
 const ShootButton = ({ onShoot }) => {
   const [isShooting, setIsShooting] = useState(false);
+  const activeTouchRef = useRef(null);
 
-  const onPressIn = () => {
-    console.log('Shoot button pressed');
+  const handleTouchStart = (event) => {
+    const touch = event.nativeEvent;
+    activeTouchRef.current = touch.identifier; // Save the identifier
+
+    console.log('Press In ID:', touch.identifier);
+
     setIsShooting(true);
     onShoot(); // Shoot immediately on press
   };
 
-  const onPressOut = () => {
-    console.log('Shoot button released');
+  const handleTouchEnd = (event) => {
+    const touch = event.nativeEvent;
+    if(activeTouchRef.current !== touch.identifier)
+    {
+      console.log(`Press Out, not my touch: ${touch.identifier} expexted: ${activeTouchRef.current}`);
+      return;
+    }
+    console.log('Press Out ID:', touch.identifier);
     setIsShooting(false);
   };
 
@@ -29,13 +40,15 @@ const ShootButton = ({ onShoot }) => {
   }, [isShooting]);
 
   return (
-    <TouchableOpacity
+    <View
       style={styles.shootButton}
-      onPressIn={onPressIn}
-      onPressOut={onPressOut}
+      onStartShouldSetResponder={() => true}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+      onTouchCandel={handleTouchEnd}
     >
       <Text style={styles.text}>Shoot</Text>
-    </TouchableOpacity>
+    </View>
   );
 };
 

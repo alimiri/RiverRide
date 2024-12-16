@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect, useMemo } from 'react';
-import { StyleSheet, View, Text, Dimensions, Image, TouchableOpacity, Animated, Platform, Alert } from 'react-native';
+import { View, Text, Dimensions, Image, Alert } from 'react-native';
 import Matter from 'matter-js';
 import MovementArea from './MovementArea'; // Import the new MovementArea
 import { PanResponder } from 'react-native';
