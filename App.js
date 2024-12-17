@@ -153,15 +153,16 @@ export default function App() {
   onScrollPositionChange = (scrollPosition) => {
     if (!isGameRunning) return;
 
+    // check for border collision
     const bottomOfRiver = riverSegments.totalHeight - scrollPosition - screenHeight;
-    const airPlaneYRelative = screenHeight - initialPosition.y + bottomOfRiver + AIRPLANE_WIDTH;
+    const airPlaneYRelative = screenHeight - initialPosition.y + bottomOfRiver - AIRPLANE_WIDTH;
     for (let i = 0; i < riverSegments.river.length; i++) {
-      if (airPlaneYRelative < riverSegments.river[i].offset + riverSegments.river[i].length) {
-        const y = airPlaneYRelative - riverSegments.river[i].offset;
+      const segment = riverSegments.river[i];
+      if (airPlaneYRelative < segment.offset + segment.length) {
+        const y = airPlaneYRelative - segment.offset;
 
         // Calculate the width and borders of the river at the current y
-        const widthAtY = riverSegments.river[i].startWidth +
-          (y / riverSegments.river[i].length) * (riverSegments.river[i].endWidth - riverSegments.river[i].startWidth);
+        const widthAtY = segment.startWidth + (y / segment.length) * (segment.endWidth - segment.startWidth);
         leftBorder.current = (screenWidth - widthAtY) / 2;
         rightBorder.current = leftBorder.current + widthAtY;
 
@@ -171,8 +172,21 @@ export default function App() {
         //setPlayerPosition({x: rightBorder.current - AIRPLANE_WIDTH / 2, y: initialPosition.y});
         //playerPositionRef.current = playerPosition;
 
-        const currentX = playerPositionRef.current.x;
-        checkForCollision(currentX);
+        checkForCollision(playerPositionRef.current.x);
+
+        //check bridge collision
+        const bridge = segment.bridges.find(bridge => {
+          if(airPlaneYRelative + 218 >= bridge.points[0].y + segment.offset) {
+            console.log(airPlaneYRelative, bridge.points[0].y + segment.offset);
+            console.log(`bridge: ${bridge.points[0].x} ${bridge.points[0].y} ${bridge.points[1].x} ${bridge.points[1].y} ${bridge.points[2].x} ${bridge.points[2].y} ${bridge.points[3].x} ${bridge.points[3].y}`);
+            return true;
+          }
+        });
+        if(bridge) {
+          handleCollision();
+          return true;
+      }
+
         break;
       }
     }
@@ -185,6 +199,7 @@ export default function App() {
       handleCollision();
       return true;
     }
+
     return false;
   };
 

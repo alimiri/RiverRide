@@ -62,8 +62,7 @@ export default function generateRiverSegments(
             const y = Math.floor(randomTree.next() * length); // Random y within segment length
 
             // Calculate the river's width at this y (interpolated between startWidth and endWidth)
-            const interpolatedWidth =
-                startWidth + ((endWidth - startWidth) * y) / length;
+            const interpolatedWidth = startWidth + ((endWidth - startWidth) * y) / length;
 
             // Calculate the river's left and right borders at this y
             const leftBorder = (screenWidth - interpolatedWidth) / 2;
@@ -83,7 +82,29 @@ export default function generateRiverSegments(
             trees.push({ x, y });
         }
 
-        const bridges = [{x1: (screenWidth - startWidth) / 2, y1: length / 2 - 100, x2: screenWidth - (screenWidth - startWidth) / 2, y2: length / 2 + 100}];
+        //generate briges
+        const bridge = {points: []};
+        const y1 = length / 2 - 100;
+        const y2 = length / 2 + 100;
+
+        bridge.points.push({y: y1, x: (screenWidth - startWidth - (endWidth - startWidth) * y1 / length) / 2});
+        bridge.points.push({y: y1, x: screenWidth - bridge.points[0].x});
+        bridge.points.push({y: y2, x: (screenWidth + startWidth + (endWidth - startWidth) * y2 / length) / 2});
+        bridge.points.push({y: y2, x: screenWidth - bridge.points[2].x});
+
+        bridge.y1 = length / 2 - 100;
+        bridge.y2 = bridge.y1;
+        let interpolatedWidth = (screenWidth - startWidth - ((endWidth - startWidth) * bridge.y1) / length) / 2;
+        bridge.x1 = (screenWidth - interpolatedWidth) / 2;
+        bridge.x2 = bridge.x1 + interpolatedWidth;
+
+        bridge.y3 = length / 2 + 100;
+        bridge.y4 = bridge.y3;
+        interpolatedWidth = startWidth + ((endWidth - startWidth) * bridge.y3) / length;
+        bridge.x3 = (screenWidth - interpolatedWidth) / 2;
+        bridge.x4 = bridge.x3 + interpolatedWidth;
+
+        const bridges = [bridge];
         const helicopters = [{startX: 100, y: 100, direction: 'ltr'}];
 
         // Push the segment (startWidth, endWidth, length, trees)

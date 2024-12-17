@@ -27,30 +27,31 @@ function RiverVisualization({ width, riverSegments, treeImage }) {
         let bridges = [];
         riverSegments.river.forEach((segment, segmentIndex) => {
             segment.bridges.forEach((bridge, bridgeIndex) => {
-                const y = bridge.y1 + segment.offset;
-                const height = bridge.y2 - bridge.y1; // Correct calculation for height
-                const x = bridge.x1;
-                const width = bridge.x2 - bridge.x1; // Correct calculation for width
-                console.log(x, y, width, height); // Log for debugging
+                const polygonPoints = bridge.points.map((p) => `${p.x},${p.y}`).join(' ');
 
                 bridges.push(
-                    <View
+                    <Svg
                         key={`bridge-${segmentIndex}-${bridgeIndex}`}
                         style={{
                             position: 'absolute',
-                            left: x,
-                            top: y,
-                            width: width,
-                            height: height,
-                            backgroundColor: 'brown', // Use `backgroundColor` instead of `fill`
+                            left: 0,
+                            top: segment.offset,
+                            width: '100%',
+                            height: segment.length,
                             zIndex: 100,
                         }}
-                    />
+                    >
+                        <Polygon
+                            points={polygonPoints}
+                            fill="brown"
+                        />
+                    </Svg>
                 );
             });
         });
         return bridges;
     };
+
 
     const renderTrees = () => {
         let trees = [];
