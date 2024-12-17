@@ -5,9 +5,11 @@ import MovementArea from './MovementArea'; // Import the new MovementArea
 import riverSegmentGenerator from './RiverSegmentGenerator'; // Import the riverSegmentGenerator
 import ScrollingBackground from './ScrollingBackground';  // Import the scrolling background
 import ShootButton from './ShootButton';
+import Svg, { Polygon } from 'react-native-svg';
 
 
 const AIRPLANE_WIDTH = 50; // Width of the airplane
+const AIRPLANE_HEIGHT = 50; // Height of the airplane
 const SPEED_INIT = 1000;
 const SPEED_MAX = 1500;
 const SPEED_MIN = 50;
@@ -20,7 +22,7 @@ const BULLET_SPEED = 5;
 const BULLET_WIDTH = 2;
 const BULLET_HEIGHT = 3;
 
-let initialPosition;
+let initialPosition = { x: 0, y: 0 };
 
 export default function App() {
   const [score, setScore] = useState(0);
@@ -32,26 +34,37 @@ export default function App() {
   const [bullets, setBullets] = useState([]);
   const engine = useRef(null);
   const world = useRef(null);
-
-  const [isGameRunning, setIsGameRunning] = useState(true);
+  const [scrollingViewDimensions, setScrollingViewDimensions] = useState({ x: 0, y: 0, width: 0, height: 0 });
+  const [movementViewDimensions, setMovementViewDimensions] = useState({ x: 0, y: 0, width: 0, height: 0 });
+  const [isGameRunning, setIsGameRunning] = useState(false);
   const leftBorder = useRef(0);
   const rightBorder = useRef(0);
   const collisionHandledRef = useRef(false);
+  const [resetFlag, setResetFlag] = useState(false);
 
   const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
-  initialPosition = { x: screenWidth / 2, y: screenHeight * 0.8 };
   const [playerPosition, setPlayerPosition] = useState(initialPosition);
+  const [airplaneYRelative, setAirplaneYRelative] = useState(0);
   const memoizedStyles = useMemo(() => styles(screenWidth, screenHeight), [screenWidth, screenHeight]);
-  const playerPositionRef = useRef(playerPosition);
 
   const RIVER_MAX_WIDTH_RATIO = screenWidth * 0.9; // Maximum width of the river
   const RIVER_MIN_WIDTH_RATIO = AIRPLANE_WIDTH * 2; // Maximum width of the river
 
   const entitiesRef = useRef(null);  // Ref to store entities
 
-  useEffect(() => {
-    playerPositionRef.current = playerPosition;
-  }, [playerPosition]);
+  const handleScrollingBackgroundDimensionsChange = (layout) => {
+    setScrollingViewDimensions(layout);
+    initialPosition = { x: screenWidth / 2, y: movementViewDimensions.y - layout.y - 50 - AIRPLANE_HEIGHT / 2};
+    setPlayerPosition(initialPosition);
+    console.log('Scrolling background dimensions:', initialPosition, movementViewDimensions.y, layout.y);
+  };
+
+  const handleMovementAreaDimensionsChange = (layout) => {
+    setMovementViewDimensions(layout);
+    initialPosition = { x: screenWidth / 2, y: layout.y - scrollingViewDimensions.y - 50 - AIRPLANE_HEIGHT / 2};
+    setPlayerPosition(initialPosition);
+    console.log('Movement area dimensions:', initialPosition, layout.y, scrollingViewDimensions.y);
+  };
 
   const moveAirplane = () => {
     setPlayerPosition((prev) => {
@@ -71,15 +84,19 @@ export default function App() {
     animationFrame.current = requestAnimationFrame(moveAirplane);
   };
 
-  const handleShoot = () => {
+    const handleShoot = () => {
+      if(!isGameRunning) {
+        restartGame();
+        setIsGameRunning(true);
+      }
     if (!world.current) {
       console.error('Matter.js world is not defined!');
       return;
     }
     // Create the bullet
     const bullet = Matter.Bodies.rectangle(
-      playerPositionRef.current.x,
-      playerPositionRef.current.y,
+      playerPosition.x,
+      playerPosition.y - AIRPLANE_HEIGHT / 2,
       BULLET_WIDTH,
       BULLET_HEIGHT,
       {
@@ -154,12 +171,13 @@ export default function App() {
     if (!isGameRunning) return;
 
     // check for border collision
-    const bottomOfRiver = riverSegments.totalHeight - scrollPosition - screenHeight;
-    const airPlaneYRelative = screenHeight - initialPosition.y + bottomOfRiver - AIRPLANE_WIDTH;
+    const bottomOfRiver = riverSegments.totalHeight - scrollPosition - screenHeight + movementViewDimensions.height + scrollingViewDimensions.y;
+    const airplaneYRelative = bottomOfRiver + 50 + AIRPLANE_HEIGHT;
+    setAirplaneYRelative(airplaneYRelative);
     for (let i = 0; i < riverSegments.river.length; i++) {
       const segment = riverSegments.river[i];
-      if (airPlaneYRelative < segment.offset + segment.length) {
-        const y = airPlaneYRelative - segment.offset;
+      if (airplaneYRelative < segment.offset + segment.length) {
+        const y = airplaneYRelative - segment.offset;
 
         // Calculate the width and borders of the river at the current y
         const widthAtY = segment.startWidth + (y / segment.length) * (segment.endWidth - segment.startWidth);
@@ -170,15 +188,15 @@ export default function App() {
         //setPlayerPosition({x: leftBorder.current + AIRPLANE_WIDTH / 2, y: initialPosition.y});
         //stick to the right border
         //setPlayerPosition({x: rightBorder.current - AIRPLANE_WIDTH / 2, y: initialPosition.y});
-        //playerPositionRef.current = playerPosition;
 
-        checkForCollision(playerPositionRef.current.x);
+        checkForCollision(playerPosition.x);
 
         //check bridge collision
         const bridge = segment.bridges.find(bridge => {
-          if(airPlaneYRelative + 218 >= bridge.points[0].y + segment.offset) {
-            console.log(airPlaneYRelative, bridge.points[0].y + segment.offset);
+          if(airplaneYRelative >= bridge.points[0].y + segment.offset) {
+            console.log(airplaneYRelative, bridge.points[0].y + segment.offset);
             console.log(`bridge: ${bridge.points[0].x} ${bridge.points[0].y} ${bridge.points[1].x} ${bridge.points[1].y} ${bridge.points[2].x} ${bridge.points[2].y} ${bridge.points[3].x} ${bridge.points[3].y}`);
+            console.log(`bottom: ${bottomOfRiver} segment: ${segment.offset} ${segment.length}`);
             return true;
           }
         });
@@ -238,10 +256,10 @@ export default function App() {
 
   const restartGame = () => {
     collisionHandledRef.current = false; // Reset collision handling flag
-    setIsGameRunning(true); // Restart the game
     setPlayerPosition(initialPosition); // Reset the player position
     setFuel(FUEL_INIT); // Reset fuel
     speed.current = SPEED_INIT; // Reset speed
+    setResetFlag((prev) => !prev);
   };
 
   useEffect(() => {
@@ -302,8 +320,6 @@ export default function App() {
   return (
     <View style={{ flex: 1, position: 'relative' }}>
       <View style={memoizedStyles.container}>
-        {/* Other game components */}
-        {/* Top Info Strip */}
         <View style={memoizedStyles.infoStrip}>
           <Text style={memoizedStyles.infoText}>Score: {score}</Text>
           <Text style={memoizedStyles.infoText}>Speed: {speed.current}</Text>
@@ -321,11 +337,13 @@ export default function App() {
             speed={speed.current}
             isGameRunning={isGameRunning}
             onScrollPositionChange={onScrollPositionChange}
+            onDimensionsChange={handleScrollingBackgroundDimensionsChange}
+            resetFlag={resetFlag}
           />
           )}
           <Image
             source={require('./assets/airplane.png')}
-            style={[memoizedStyles.airplane, { left: playerPosition.x - AIRPLANE_WIDTH / 2 }]}
+            style={[memoizedStyles.airplane, { left: playerPosition.x - AIRPLANE_WIDTH / 2, top: playerPosition.y - AIRPLANE_HEIGHT / 2 }]}
           />
           {bullets.map((bullet, index) => {
             return (<View
@@ -333,7 +351,7 @@ export default function App() {
               style={{
                 position: 'absolute',
                 left: bullet.position.x,
-                top: bullet.position.y - 150,
+                top: bullet.position.y,
                 width: BULLET_WIDTH,
                 height: BULLET_HEIGHT,
                 backgroundColor: 'red',
@@ -343,15 +361,15 @@ export default function App() {
           })}
         </View>
 
-        {/* Bottom Controls Strip */}
         <View style={memoizedStyles.controlsStrip}>
-          <ShootButton onShoot={handleShoot} />
+          <ShootButton onShoot={handleShoot} isGameRunning={isGameRunning}/>
 
           {/* Right: Movement Area */}
           <MovementArea
             onTap={(dir) => ['left', 'right', 'still'].includes(dir) ? startMoving(dir) : startAcc(dir)}
             onHold={(dir) => ['left', 'right', 'still'].includes(dir) ? startMoving(dir) : startAcc(dir)}
             onStop={stopMoving}
+            onDimensionsChange={handleMovementAreaDimensionsChange}
           />
         </View>
       </View>
@@ -411,12 +429,10 @@ const styles = (screenWidth, screenHeight) => ({
   },
   airplane: {
     position: 'absolute',
-    bottom: 50,
     width: AIRPLANE_WIDTH,
     height: AIRPLANE_WIDTH,
   },
 
-  // Bottom Controls Strip
   controlsStrip: {
     height: screenHeight * 0.2,
     flexDirection: 'row',

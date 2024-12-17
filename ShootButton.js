@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 
-const ShootButton = ({ onShoot }) => {
+const ShootButton = ({ onShoot, isGameRunning }) => {
   const [isShooting, setIsShooting] = useState(false);
 
   const handleTouchStart = () => {
@@ -15,7 +15,7 @@ const ShootButton = ({ onShoot }) => {
 
   useEffect(() => {
     let interval;
-    if (isShooting) {
+    if (isShooting && isGameRunning) {
       interval = setInterval(() => {
         onShoot();
       }, 100); // Adjust the shooting interval as needed
@@ -23,7 +23,7 @@ const ShootButton = ({ onShoot }) => {
     return () => {
       clearInterval(interval); // Cleanup interval on unmount or when shooting stops
     };
-  }, [isShooting]);
+  }, [isShooting, isGameRunning]);
 
   return (
     <View

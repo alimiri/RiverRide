@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { View, StyleSheet, Text } from 'react-native';
 
-const MovementArea = ({ onTap, onHold, onStop }) => {
+const MovementArea = ({ onTap, onHold, onStop, onDimensionsChange }) => {
   const [areaDimensions, setAreaDimensions] = useState({ areaWidth: 0, areaHeight: 0, offsetX: 0, offsetY: 0 });
   const intervalRef = useRef(null);
   const currentArea = useRef(null);
@@ -83,6 +83,7 @@ const MovementArea = ({ onTap, onHold, onStop }) => {
     if (currentArea.current) {
       currentArea.current.measure((x, y, width, height, pageX, pageY) => {
         setAreaDimensions({ areaWidth: width, areaHeight: height, offsetX: pageX, offsetY: pageY });
+        onDimensionsChange({ x: pageX, y: pageY, width: width, height: height });
       });
     }
   }, []);
@@ -116,6 +117,7 @@ const MovementArea = ({ onTap, onHold, onStop }) => {
       onTouchEnd={handleTouchEnd}
       onTouchCancel={handleTouchEnd}
       ref={currentArea}
+      onDimensionsChange={onDimensionsChange}
     >
     {Array.from({ length: 3 }).map((_, row) => (
       <View key={`row-${row}`} style={styles.row}>
