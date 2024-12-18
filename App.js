@@ -10,7 +10,7 @@ import Svg, { Polygon } from 'react-native-svg';
 
 const AIRPLANE_WIDTH = 50; // Width of the airplane
 const AIRPLANE_HEIGHT = 50; // Height of the airplane
-const SPEED_INIT = 1000;
+const SPEED_INIT = 100;
 const SPEED_MAX = 1500;
 const SPEED_MIN = 50;
 const SPEED_INCREASE_STEP = 1;
@@ -41,11 +41,12 @@ export default function App() {
   const rightBorder = useRef(0);
   const collisionHandledRef = useRef(false);
   const [resetFlag, setResetFlag] = useState(false);
+  const [resetRiver, setResetRiver] = useState(false);
 
   const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
   const [playerPosition, setPlayerPosition] = useState(initialPosition);
   const [airplaneYRelative, setAirplaneYRelative] = useState(0);
-  const [bottomOfTheRiver, setBottomOfTheRiver] = useState(0);
+  const bottomOfTheRiverRef = useRef(0);
   const memoizedStyles = useMemo(() => styles(screenWidth, screenHeight), [screenWidth, screenHeight]);
 
   const RIVER_MAX_WIDTH_RATIO = screenWidth * 0.9; // Maximum width of the river
@@ -170,9 +171,8 @@ export default function App() {
     if (!isGameRunning) return;
 
     // check for border collision
-    const bottomOfRiver = riverSegments.totalHeight - scrollPosition - screenHeight + movementViewDimensions.height + scrollingViewDimensions.y;
-    setBottomOfTheRiver(() => bottomOfRiver);
-    const airplaneYRelative = bottomOfRiver + 50 + AIRPLANE_HEIGHT;
+    bottomOfTheRiverRef.current = riverSegments.totalHeight - scrollPosition - screenHeight + movementViewDimensions.height + scrollingViewDimensions.y;
+    const airplaneYRelative = bottomOfTheRiverRef.current + 50 + AIRPLANE_HEIGHT;
     setAirplaneYRelative(airplaneYRelative);
     for (let i = 0; i < riverSegments.river.length; i++) {
       const segment = riverSegments.river[i];
@@ -260,7 +260,7 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (!isGameRunning) return; // Stop the interval when the game is not running
+    if (!isGameRunning) return;
 
     const interval = setInterval(() => {
       setFuel((prevFuel) => {
@@ -285,44 +285,53 @@ export default function App() {
   }, []);
 
   // Handle bullet movement
+  const bulletMovementIntervalRef = useRef(null);
   useEffect(() => {
-    const interval = setInterval(() => {
-      if (entitiesRef.current) {
-        setBullets((prevBullets) => {
-          const newBullets = prevBullets
-            .map((bullet) => {
-              Matter.Body.translate(bullet, { x: 0, y: -BULLET_SPEED });
-              return bullet;
-            })
-            .filter((bullet) => {
-              //check for bullet to the bridge collision
-              const bulletYRelative = bottomOfTheRiver + bullet.position.y;
-              console.log(`bulletYRelative: ${bulletYRelative}, bottomOfTheRiver: ${bottomOfTheRiver}`);
-              for (let i = 0; i < riverSegments.river.length; i++) {
-                const segment = riverSegments.river[i];
-                if (bulletYRelative < segment.offset + segment.length) {
-                  console.log(`i: ${i}`);
-                  const bridgeIndex = segment.bridges.findIndex(bridge => {
-                    if (bulletYRelative >= bridge.points[0].y + segment.offset) {
-                      return true;
+    if (isGameRunning) {
+      bulletMovementIntervalRef.current = setInterval(() => {
+        if (entitiesRef.current) {
+          setBullets((prevBullets) => {
+            const newBullets = prevBullets
+              .map((bullet) => {
+                Matter.Body.translate(bullet, { x: 0, y: -BULLET_SPEED });
+                return bullet;
+              })
+              .filter((bullet) => {
+                //check for bullet to the bridge collision
+                const bulletYRelative = bottomOfTheRiverRef.current + 50 + AIRPLANE_HEIGHT + playerPosition.y - AIRPLANE_HEIGHT / 2 - bullet.position.y;
+                for (let i = 0; i < riverSegments.river.length; i++) {
+                  const segment = riverSegments.river[i];
+                  if (bulletYRelative < segment.offset + segment.length) {
+                    const bridgeIndex = segment.bridges.findIndex(bridge => {
+                      if (bulletYRelative >= bridge.points[0].y + segment.offset) {
+                        return true;
+                      }
+                    });
+                    if (bridgeIndex >= 0) {
+                      segment.bridges.splice(bridgeIndex,1);
+                      setResetRiver((prev) => !prev);
+                      return false;
                     }
-                  });
-                  if (bridgeIndex >= 0) {console.log(`bullet hit the bridge at ${bulletYRelative}`);
-                    segment.bridges.splice(bridgeIndex,1);
-                    return false;
+                    break;
                   }
-                  break;
                 }
-              }
-              return bullet.position.y > 0
-            }); // Remove bullets that move off screen
-          return newBullets;
-        });
+                return bullet.position.y > 0
+              }); // Remove bullets that move off screen
+            return newBullets;
+          });
+        }
+      }, 1000 / 60); // Update every frame
+    } else if(bulletMovementIntervalRef.current) {
+      clearInterval(bulletMovementIntervalRef.current);
+      bulletMovementIntervalRef.current = null;
+    }
+    return () => {
+      if(bulletMovementIntervalRef.current) {
+        clearInterval(bulletMovementIntervalRef.current);
+        bulletMovementIntervalRef.current = null;
       }
-    }, 1000 / 60); // Update every frame
-
-    return () => clearInterval(interval);
-  }, []);
+    }
+  }, [isGameRunning]);
 
   // Function to generate and update river segments
   useEffect(() => {
@@ -358,6 +367,7 @@ export default function App() {
             onScrollPositionChange={onScrollPositionChange}
             onDimensionsChange={handleScrollingBackgroundDimensionsChange}
             resetFlag={resetFlag}
+            resetRiver={resetRiver}
           />
           )}
           <Image

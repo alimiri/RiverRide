@@ -13,6 +13,7 @@ const ScrollingBackground = ({
     onScrollPositionChange,
     onDimensionsChange,
     resetFlag,
+    resetRiver
 }) => {
     const [sound, setSound] = useState(null);
     const soundRef = useRef(null); // Reference for sound instance
@@ -20,7 +21,7 @@ const ScrollingBackground = ({
 
     const SCROLL_INITIAL_POSITION = riverSegments.totalHeight - height;
     const scrollPosition = useRef(SCROLL_INITIAL_POSITION); // Single source of truth for scroll position
-    const intervalRef = useRef(null); // Reference for the scrolling interval
+    const intervalRef = useRef(null);
 
     useEffect(() => {
         if (currentAreaRef.current) {
@@ -32,20 +33,20 @@ const ScrollingBackground = ({
 
     // Memoize the long river construction
     const longRiver = useMemo(
-        () => (
-            <View style={{ transform: [{ rotate: '180deg' }] }}>
+        () => {
+            return (<View style={{ transform: [{ rotate: '180deg' }] }}>
                 <RiverVisualization
                     width={width}
                     riverSegments={riverSegments}
                     treeImage={treeImage}
                 />
-            </View>
-        ),
-        [width, riverSegments]
+            </View>)
+        },
+        [width, riverSegments, resetRiver]
     );
 
     useEffect(() => {
-            scrollPosition.current = SCROLL_INITIAL_POSITION;
+        scrollPosition.current = SCROLL_INITIAL_POSITION;
     }, [resetFlag]);
 
     // Load sound on mount and cleanup on unmount
