@@ -45,6 +45,7 @@ export default function App() {
   const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
   const [playerPosition, setPlayerPosition] = useState(initialPosition);
   const [airplaneYRelative, setAirplaneYRelative] = useState(0);
+  const [bottomOfTheRiver, setBottomOfTheRiver] = useState(0);
   const memoizedStyles = useMemo(() => styles(screenWidth, screenHeight), [screenWidth, screenHeight]);
 
   const RIVER_MAX_WIDTH_RATIO = screenWidth * 0.9; // Maximum width of the river
@@ -54,16 +55,14 @@ export default function App() {
 
   const handleScrollingBackgroundDimensionsChange = (layout) => {
     setScrollingViewDimensions(layout);
-    initialPosition = { x: screenWidth / 2, y: movementViewDimensions.y - layout.y - 50 - AIRPLANE_HEIGHT / 2};
+    initialPosition = { x: screenWidth / 2, y: movementViewDimensions.y - layout.y - 50 - AIRPLANE_HEIGHT / 2 };
     setPlayerPosition(initialPosition);
-    console.log('Scrolling background dimensions:', initialPosition, movementViewDimensions.y, layout.y);
   };
 
   const handleMovementAreaDimensionsChange = (layout) => {
     setMovementViewDimensions(layout);
-    initialPosition = { x: screenWidth / 2, y: layout.y - scrollingViewDimensions.y - 50 - AIRPLANE_HEIGHT / 2};
+    initialPosition = { x: screenWidth / 2, y: layout.y - scrollingViewDimensions.y - 50 - AIRPLANE_HEIGHT / 2 };
     setPlayerPosition(initialPosition);
-    console.log('Movement area dimensions:', initialPosition, layout.y, scrollingViewDimensions.y);
   };
 
   const moveAirplane = () => {
@@ -84,11 +83,11 @@ export default function App() {
     animationFrame.current = requestAnimationFrame(moveAirplane);
   };
 
-    const handleShoot = () => {
-      if(!isGameRunning) {
-        restartGame();
-        setIsGameRunning(true);
-      }
+  const handleShoot = () => {
+    if (!isGameRunning) {
+      restartGame();
+      setIsGameRunning(true);
+    }
     if (!world.current) {
       console.error('Matter.js world is not defined!');
       return;
@@ -172,6 +171,7 @@ export default function App() {
 
     // check for border collision
     const bottomOfRiver = riverSegments.totalHeight - scrollPosition - screenHeight + movementViewDimensions.height + scrollingViewDimensions.y;
+    setBottomOfTheRiver(() => bottomOfRiver);
     const airplaneYRelative = bottomOfRiver + 50 + AIRPLANE_HEIGHT;
     setAirplaneYRelative(airplaneYRelative);
     for (let i = 0; i < riverSegments.river.length; i++) {
@@ -193,17 +193,14 @@ export default function App() {
 
         //check bridge collision
         const bridge = segment.bridges.find(bridge => {
-          if(airplaneYRelative >= bridge.points[0].y + segment.offset) {
-            console.log(airplaneYRelative, bridge.points[0].y + segment.offset);
-            console.log(`bridge: ${bridge.points[0].x} ${bridge.points[0].y} ${bridge.points[1].x} ${bridge.points[1].y} ${bridge.points[2].x} ${bridge.points[2].y} ${bridge.points[3].x} ${bridge.points[3].y}`);
-            console.log(`bottom: ${bottomOfRiver} segment: ${segment.offset} ${segment.length}`);
+          if (airplaneYRelative >= bridge.points[0].y + segment.offset) {
             return true;
           }
         });
-        if(bridge) {
+        if (bridge) {
           handleCollision();
           return true;
-      }
+        }
 
         break;
       }
@@ -292,12 +289,34 @@ export default function App() {
     const interval = setInterval(() => {
       if (entitiesRef.current) {
         setBullets((prevBullets) => {
-          return prevBullets
+          const newBullets = prevBullets
             .map((bullet) => {
               Matter.Body.translate(bullet, { x: 0, y: -BULLET_SPEED });
               return bullet;
             })
-            .filter((bullet) => bullet.position.y > 0); // Remove bullets that move off screen
+            .filter((bullet) => {
+              //check for bullet to the bridge collision
+              const bulletYRelative = bottomOfTheRiver + bullet.position.y;
+              console.log(`bulletYRelative: ${bulletYRelative}, bottomOfTheRiver: ${bottomOfTheRiver}`);
+              for (let i = 0; i < riverSegments.river.length; i++) {
+                const segment = riverSegments.river[i];
+                if (bulletYRelative < segment.offset + segment.length) {
+                  console.log(`i: ${i}`);
+                  const bridgeIndex = segment.bridges.findIndex(bridge => {
+                    if (bulletYRelative >= bridge.points[0].y + segment.offset) {
+                      return true;
+                    }
+                  });
+                  if (bridgeIndex >= 0) {console.log(`bullet hit the bridge at ${bulletYRelative}`);
+                    segment.bridges.splice(bridgeIndex,1);
+                    return false;
+                  }
+                  break;
+                }
+              }
+              return bullet.position.y > 0
+            }); // Remove bullets that move off screen
+          return newBullets;
         });
       }
     }, 1000 / 60); // Update every frame
@@ -308,7 +327,7 @@ export default function App() {
   // Function to generate and update river segments
   useEffect(() => {
     const generateRiver = () => {
-      const segments = riverSegmentGenerator(screenWidth, RIVER_MIN_WIDTH_RATIO, RIVER_MAX_WIDTH_RATIO, screenHeight / 2, screenHeight * 5, 100, 50, {seedW: 1, seedH: 2, seedTree: 3, seedBridge: 1, seedHelicopter: 10});
+      const segments = riverSegmentGenerator(screenWidth, RIVER_MIN_WIDTH_RATIO, RIVER_MAX_WIDTH_RATIO, screenHeight / 2, screenHeight * 5, 100, 50, { seedW: 1, seedH: 2, seedTree: 3, seedBridge: 1, seedHelicopter: 10 });
       setRiverSegments(segments);
     };
 
@@ -362,7 +381,7 @@ export default function App() {
         </View>
 
         <View style={memoizedStyles.controlsStrip}>
-          <ShootButton onShoot={handleShoot} isGameRunning={isGameRunning}/>
+          <ShootButton onShoot={handleShoot} isGameRunning={isGameRunning} />
 
           {/* Right: Movement Area */}
           <MovementArea
