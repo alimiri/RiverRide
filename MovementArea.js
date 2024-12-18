@@ -1,9 +1,9 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { View, StyleSheet, Text } from 'react-native';
 
-const MovementArea = ({ onTap, onHold, onStop, onDimensionsChange }) => {
+const MovementArea = ({ onMoveAcc, onDimensionsChange, isGameRunning }) => {
   const [areaDimensions, setAreaDimensions] = useState({ areaWidth: 0, areaHeight: 0, offsetX: 0, offsetY: 0 });
-  const intervalRef = useRef(null);
+  const intervalMoveRef = useRef(null);
   const currentArea = useRef(null);
   const currentAcc = useRef(null);
   const intervalAccRef = useRef(null);
@@ -33,51 +33,68 @@ const MovementArea = ({ onTap, onHold, onStop, onDimensionsChange }) => {
 
   const handleTouchStart = (event) => {
     const { move, acc } = getSections(event.nativeEvent);
-
+    if(intervalMoveRef.current) {
+      clearInterval(intervalMoveRef.current);
+      intervalMoveRef.current = null;
+    }
+    if(intervalAccRef.current) {
+      clearInterval(intervalAccRef.current);
+      intervalAccRef.current = null;
+    }
+    if(!isGameRunning) {
+      return;
+    }
     currentArea.current = move;
-    onTap(move); // Call onTap directly, not bind
-    intervalRef.current = setInterval(() => onHold(move), 100);
+    onMoveAcc(move);
+    intervalMoveRef.current = setInterval(() => onMoveAcc(move), 30);
 
     currentAcc.current = acc;
-    onTap(acc); // Call onTap directly, not bind
-    intervalAccRef.current = setInterval(() => onHold(acc), 30);
+    onMoveAcc(acc);
+    intervalAccRef.current = setInterval(() => onMoveAcc(acc), 30);
   };
 
   const handleTouchMove = (event) => {
+    if(!isGameRunning) {
+      if(intervalMoveRef.current) {
+        clearInterval(intervalMoveRef.current);
+        intervalMoveRef.current = null;
+      }
+      if(intervalAccRef.current) {
+        clearInterval(intervalAccRef.current);
+        intervalAccRef.current = null;
+      }
+      return;
+    }
+
     const { move, acc } = getSections(event.nativeEvent);
 
     if (currentArea.current !== move) {
       currentArea.current = move;
-      clearInterval(intervalRef.current);
-      onTap(move); // Call onTap directly, not bind
-      intervalRef.current = setInterval(() => onHold(move), 100);
+      clearInterval(intervalMoveRef.current);
+      onMoveAcc(move);
+      intervalMoveRef.current = setInterval(() => onMoveAcc(move), 30);
     }
 
     if (currentAcc.current !== acc) {
       currentAcc.current = acc;
       clearInterval(intervalAccRef.current);
-      onTap(acc); // Call onTap directly, not bind
-      intervalAccRef.current = setInterval(() => onHold(acc), 30);
+      onMoveAcc(acc);
+      intervalAccRef.current = setInterval(() => onMoveAcc(acc), 30);
     }
   };
 
   const handleTouchEnd = (event) => {
-    clearInterval(intervalRef.current);
-    clearInterval(intervalAccRef.current);
-    intervalRef.current = null;
-    intervalAccRef.current = null;
+    if(intervalMoveRef.current) {
+      clearInterval(intervalMoveRef.current);
+      intervalMoveRef.current = null;
+    }
+    if(intervalAccRef.current) {
+      clearInterval(intervalAccRef.current);
+      intervalAccRef.current = null;
+    }
     currentArea.current = null;
     currentAcc.current = null;
-
-    onStop(); // Stop airplane movement
   };
-
-  useEffect(() => {
-    return () => {
-      clearInterval(intervalRef.current);
-      clearInterval(intervalAccRef.current);
-    };
-  }, []);
 
   useEffect(() => {
     if (currentArea.current) {

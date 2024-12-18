@@ -10,7 +10,7 @@ import Svg, { Polygon } from 'react-native-svg';
 
 const AIRPLANE_WIDTH = 50; // Width of the airplane
 const AIRPLANE_HEIGHT = 50; // Height of the airplane
-const SPEED_INIT = 100;
+const SPEED_INIT = 200;
 const SPEED_MAX = 1500;
 const SPEED_MIN = 50;
 const SPEED_INCREASE_STEP = 1;
@@ -29,7 +29,6 @@ export default function App() {
   const speed = useRef(SPEED_INIT);
   const [fuel, setFuel] = useState(FUEL_INIT);
   const [riverSegments, setRiverSegments] = useState({ totalHeight: 0, river: [] }); // Store the river segments
-  const velocityRef = useRef(0); // Control smooth movement
   const animationFrame = useRef(null); // Reference to animation frame
   const [bullets, setBullets] = useState([]);
   const engine = useRef(null);
@@ -39,12 +38,12 @@ export default function App() {
   const [isGameRunning, setIsGameRunning] = useState(false);
   const leftBorder = useRef(0);
   const rightBorder = useRef(0);
-  const collisionHandledRef = useRef(false);
+  const endGameHandleRef = useRef(false);
   const [resetFlag, setResetFlag] = useState(false);
   const [resetRiver, setResetRiver] = useState(false);
 
   const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
-  const [playerPosition, setPlayerPosition] = useState(initialPosition);
+  const playerPosition = useRef(initialPosition);
   const [airplaneYRelative, setAirplaneYRelative] = useState(0);
   const bottomOfTheRiverRef = useRef(0);
   const memoizedStyles = useMemo(() => styles(screenWidth, screenHeight), [screenWidth, screenHeight]);
@@ -57,31 +56,31 @@ export default function App() {
   const handleScrollingBackgroundDimensionsChange = (layout) => {
     setScrollingViewDimensions(layout);
     initialPosition = { x: screenWidth / 2, y: movementViewDimensions.y - layout.y - 50 - AIRPLANE_HEIGHT / 2 };
-    setPlayerPosition(initialPosition);
+    playerPosition.current = initialPosition;
   };
 
   const handleMovementAreaDimensionsChange = (layout) => {
     setMovementViewDimensions(layout);
     initialPosition = { x: screenWidth / 2, y: layout.y - scrollingViewDimensions.y - 50 - AIRPLANE_HEIGHT / 2 };
-    setPlayerPosition(initialPosition);
+    playerPosition.current = initialPosition;
   };
 
-  const moveAirplane = () => {
-    setPlayerPosition((prev) => {
-      if (!isGameRunning) return { x: prev.x, y: prev.y };
-      const newX = prev.x + velocityRef.current;
+  const moveAirplane = (direction) => {
+    const prev = playerPosition.current;
 
-      // Clamp position to the screen boundaries
-      const clampedX = Math.max(AIRPLANE_WIDTH / 2, Math.min(screenWidth - AIRPLANE_WIDTH / 2, newX));
-      if (checkForCollision(clampedX)) {
-        return { x: prev.x, y: prev.y };
-      } else {
-        Matter.Body.setPosition(entitiesRef.current.player.body, { x: clampedX, y: prev.y });
-        return { x: clampedX, y: prev.y };
-      }
-    });
-
-    animationFrame.current = requestAnimationFrame(moveAirplane);
+    if (!isGameRunning) {
+      return;
+    }
+    let newX = prev.x;
+    if (direction === 'left') {
+      newX--;
+    } else if (direction === 'right') {
+      newX++;
+    }
+    if (!checkForCollision(newX)) {
+      Matter.Body.setPosition(entitiesRef.current.player.body, { x: newX, y: prev.y });
+      playerPosition.current = { x: newX, y: prev.y };
+    }
   };
 
   const handleShoot = () => {
@@ -95,8 +94,8 @@ export default function App() {
     }
     // Create the bullet
     const bullet = Matter.Bodies.rectangle(
-      playerPosition.x,
-      playerPosition.y - AIRPLANE_HEIGHT / 2,
+      playerPosition.current.x,
+      playerPosition.current.y - AIRPLANE_HEIGHT / 2,
       BULLET_WIDTH,
       BULLET_HEIGHT,
       {
@@ -116,31 +115,11 @@ export default function App() {
     setBullets((prevBullets) => [...prevBullets, bullet]);
   };
 
-  const startMoving = (direction) => {
-    if (!isGameRunning) return;
-    if (direction === 'left') {
-      velocityRef.current = -1;
-    } else if (direction === 'right') {
-      velocityRef.current = 1;
-    } else {
-      velocityRef.current = 0;
-    }
-    if (!animationFrame.current) moveAirplane();
-  };
-
   const startAcc = (acc) => {
     if (acc === 'up') {
       speed.current = speed.current >= SPEED_MAX ? SPEED_MAX : speed.current + SPEED_INCREASE_STEP;
     } else if (acc === 'down') {
       speed.current = speed.current <= SPEED_MIN ? SPEED_MIN : speed.current - SPEED_INCREASE_STEP;
-    }
-  };
-
-  const stopMoving = () => {
-    velocityRef.current = 0;
-    if (animationFrame.current) {
-      cancelAnimationFrame(animationFrame.current);
-      animationFrame.current = null;
     }
   };
 
@@ -185,11 +164,11 @@ export default function App() {
         rightBorder.current = leftBorder.current + widthAtY;
 
         //stick to the left border
-        //setPlayerPosition({x: leftBorder.current + AIRPLANE_WIDTH / 2, y: initialPosition.y});
+        //playerPosition.current = {x: leftBorder.current + AIRPLANE_WIDTH / 2, y: initialPosition.y};
         //stick to the right border
-        //setPlayerPosition({x: rightBorder.current - AIRPLANE_WIDTH / 2, y: initialPosition.y});
+        //playerPosition.current = {x: rightBorder.current - AIRPLANE_WIDTH / 2, y: initialPosition.y};
 
-        checkForCollision(playerPosition.x);
+        checkForCollision(playerPosition.current.x);
 
         //check bridge collision
         const bridge = segment.bridges.find(bridge => {
@@ -198,7 +177,7 @@ export default function App() {
           }
         });
         if (bridge) {
-          handleCollision();
+          handleEndGame('bridge');
           return true;
         }
 
@@ -208,40 +187,26 @@ export default function App() {
   };
 
   const checkForCollision = (xPosition) => {
-    if (!isGameRunning || collisionHandledRef.current) return true;
+    if (!isGameRunning || endGameHandleRef.current) return true;
 
     if (xPosition < leftBorder.current + AIRPLANE_WIDTH / 2 || xPosition > rightBorder.current - AIRPLANE_WIDTH / 2) {
-      handleCollision();
+      handleEndGame('border');
       return true;
     }
 
     return false;
   };
 
-  const handleCollision = () => {
-    if (collisionHandledRef.current) return; // Ensure only one collision is handled
-    collisionHandledRef.current = true; // Set flag to prevent duplicate alerts
+  const handleEndGame = (barrier) => {
+    if (endGameHandleRef.current) return; // Ensure only one collision is handled
+    endGameHandleRef.current = true; // Set flag to prevent duplicate alerts
 
     setIsGameRunning(false); // Stop the game
 
+    const message = barrier === 'fuel' ? "You ran out of fuel!" : `You hit the ${barrier}!`;
     Alert.alert(
-      "You Crashed!",
-      "Your airplane hit the borders. Restart the game?",
-      [
-        {
-          text: "Restart",
-          onPress: restartGame,
-        }
-      ]
-    );
-  };
-
-  const handleFuelIsEmpty = () => {
-    setIsGameRunning(false); // Stop the game
-
-    Alert.alert(
-      "You Ran Out of Fuel!",
-      "Your airplane hit the borders. Restart the game?",
+      `You Crashed!`,
+      `${message}. Restart the game?`,
       [
         {
           text: "Restart",
@@ -252,8 +217,8 @@ export default function App() {
   };
 
   const restartGame = () => {
-    collisionHandledRef.current = false; // Reset collision handling flag
-    setPlayerPosition(initialPosition); // Reset the player position
+    endGameHandleRef.current = false; // Reset collision handling flag
+    playerPosition.current = initialPosition; // Reset the player position
     setFuel(FUEL_INIT); // Reset fuel
     speed.current = SPEED_INIT; // Reset speed
     setResetFlag((prev) => !prev);
@@ -266,7 +231,7 @@ export default function App() {
       setFuel((prevFuel) => {
         const newFuel = Math.max(prevFuel - 1, 0); // Decrease fuel by 1, but not below 0
         if (newFuel === 0) {
-          handleFuelIsEmpty(); // Trigger game stop when fuel reaches 0
+          handleEndGame('fuel');
         }
         return newFuel;
       });
@@ -298,7 +263,7 @@ export default function App() {
               })
               .filter((bullet) => {
                 //check for bullet to the bridge collision
-                const bulletYRelative = bottomOfTheRiverRef.current + 50 + AIRPLANE_HEIGHT + playerPosition.y - AIRPLANE_HEIGHT / 2 - bullet.position.y;
+                const bulletYRelative = bottomOfTheRiverRef.current + 50 + AIRPLANE_HEIGHT + playerPosition.current.y - AIRPLANE_HEIGHT / 2 - bullet.position.y;
                 for (let i = 0; i < riverSegments.river.length; i++) {
                   const segment = riverSegments.river[i];
                   if (bulletYRelative < segment.offset + segment.length) {
@@ -372,7 +337,7 @@ export default function App() {
           )}
           <Image
             source={require('./assets/airplane.png')}
-            style={[memoizedStyles.airplane, { left: playerPosition.x - AIRPLANE_WIDTH / 2, top: playerPosition.y - AIRPLANE_HEIGHT / 2 }]}
+            style={[memoizedStyles.airplane, { left: playerPosition.current.x - AIRPLANE_WIDTH / 2, top: playerPosition.current.y - AIRPLANE_HEIGHT / 2 }]}
           />
           {bullets.map((bullet, index) => {
             return (<View
@@ -395,10 +360,9 @@ export default function App() {
 
           {/* Right: Movement Area */}
           <MovementArea
-            onTap={(dir) => ['left', 'right', 'still'].includes(dir) ? startMoving(dir) : startAcc(dir)}
-            onHold={(dir) => ['left', 'right', 'still'].includes(dir) ? startMoving(dir) : startAcc(dir)}
-            onStop={stopMoving}
+            onMoveAcc={(dir) => ['left', 'right', 'still'].includes(dir) ? moveAirplane(dir) : startAcc(dir)}
             onDimensionsChange={handleMovementAreaDimensionsChange}
+            isGameRunning={isGameRunning}
           />
         </View>
       </View>
