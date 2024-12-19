@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { View, StyleSheet, Text } from 'react-native';
 
-const MovementArea = ({ onMoveAcc, onDimensionsChange, isGameRunning }) => {
+const MovementArea = ({ onMoveAcc, onChangeAcc, onDimensionsChange, isGameRunning }) => {
   const [areaDimensions, setAreaDimensions] = useState({ areaWidth: 0, areaHeight: 0, offsetX: 0, offsetY: 0 });
   const intervalMoveRef = useRef(null);
   const currentArea = useRef(null);
@@ -49,8 +49,8 @@ const MovementArea = ({ onMoveAcc, onDimensionsChange, isGameRunning }) => {
     intervalMoveRef.current = setInterval(() => onMoveAcc(move), 30);
 
     currentAcc.current = acc;
-    onMoveAcc(acc);
-    intervalAccRef.current = setInterval(() => onMoveAcc(acc), 30);
+    onChangeAcc(acc);
+    intervalAccRef.current = setInterval(() => onChangeAcc(acc), 30);
   };
 
   const handleTouchMove = (event) => {
@@ -78,8 +78,8 @@ const MovementArea = ({ onMoveAcc, onDimensionsChange, isGameRunning }) => {
     if (currentAcc.current !== acc) {
       currentAcc.current = acc;
       clearInterval(intervalAccRef.current);
-      onMoveAcc(acc);
-      intervalAccRef.current = setInterval(() => onMoveAcc(acc), 30);
+      onChangeAcc(acc);
+      intervalAccRef.current = setInterval(() => onChangeAcc(acc), 30);
     }
   };
 

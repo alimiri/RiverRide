@@ -11,7 +11,7 @@ import { Audio } from 'expo-av';
 
 const AIRPLANE_SIZE = { width: 50, height: 50 };
 const HELICOPTER_SIZE = { width: 50, height: 50 };
-const SPEED_INIT = 500;
+const SPEED_INIT = 100;
 const SPEED_MAX = 1500;
 const SPEED_MIN = 50;
 const SPEED_INCREASE_STEP = 1;
@@ -439,30 +439,26 @@ export default function App() {
             );
           })}
           {/* helicopters */}
-          {riverSegments.river.filter((segment, index) => segment.offset + segment.length >= bottomOfTheRiverRef.current && segment.offset <= bottomOfTheRiverRef.current + movementViewDimensions.y - scrollingViewDimensions.y).
-            map((segment, index) => {
-            return (
-              <View key={`Helicopter-${index}`}>
-                {segment.helicopters.map((helicopter, index2) => {
-                  //if(index === 0)
-                    //console.log(movementViewDimensions.y, helicopter.y, segment.offset, bottomOfTheRiverRef.current, movementViewDimensions.y - scrollingViewDimensions.y - (helicopter.y + segment.offset - bottomOfTheRiverRef.current));
+          {riverSegments.river.filter(segment => segment.offset + segment.length >= bottomOfTheRiverRef.current && segment.offset <= bottomOfTheRiverRef.current + movementViewDimensions.y - scrollingViewDimensions.y).
+            map((segment, index) =>
+                segment.helicopters.map((helicopter, index2) => {
+                  //console.log(movementViewDimensions.y, helicopter.x, helicopter.y, segment.offset, bottomOfTheRiverRef.current, movementViewDimensions.y - scrollingViewDimensions.y - (helicopter.y + segment.offset - bottomOfTheRiverRef.current));
                   return (
                     <Image
                       key={`Helicopter-${index}-${index2}`}
                       source={require('./assets/helicopter.png')}
                       style={{
-                          position: 'absolute',
-                          width: HELICOPTER_SIZE.width,
-                          height: HELICOPTER_SIZE.width,
-                          left: helicopter.x,
-                          top: movementViewDimensions.y - scrollingViewDimensions.y - (helicopter.y + segment.offset - bottomOfTheRiverRef.current),
-                        }}
+                        position: 'absolute',
+                        width: HELICOPTER_SIZE.width,
+                        height: HELICOPTER_SIZE.height,
+                        left: helicopter.x,
+                        top: movementViewDimensions.y - scrollingViewDimensions.y - (helicopter.y + segment.offset - bottomOfTheRiverRef.current),
+                        zIndex: 0,
+                      }}
                     />
                   );
-                })}
-              </View>
-            );
-          })}
+                })
+            )}
           {explosions.current.map((explosion, index) => (
             <Explosion key={index} x={explosion.x} y={explosion.y - explosion.refPosition + bottomOfTheRiverRef.current} />
           ))}
@@ -473,7 +469,8 @@ export default function App() {
 
           {/* Right: Movement Area */}
           <MovementArea
-            onMoveAcc={(dir) => ['left', 'right', 'still'].includes(dir) ? moveAirplane(dir) : startAcc(dir)}
+            onMoveAcc={(dir) => moveAirplane(dir)}
+            onChangeAcc={(dir) => startAcc(dir)}
             onDimensionsChange={handleMovementAreaDimensionsChange}
             isGameRunning={isGameRunning}
           />
