@@ -5,7 +5,6 @@ import treeImage from './assets/tree.png';
 
 const ScrollingBackground = ({
     width,
-    height,
     riverSegments,
     speed,
     isGameRunning,
@@ -16,15 +15,32 @@ const ScrollingBackground = ({
 }) => {
     const currentAreaRef = useRef(null);
 
-    const SCROLL_INITIAL_POSITION = riverSegments.totalHeight - height;
-    const scrollPosition = useRef(SCROLL_INITIAL_POSITION); // Single source of truth for scroll position
-    const [renderedScrollPosition, setRenderedScrollPosition] = useState(SCROLL_INITIAL_POSITION);
+    const initPosition = useRef(null);
+    const scrollPosition = useRef(null);
+    const [renderedScrollPosition, setRenderedScrollPosition] = useState(null);
     const intervalRef = useRef(null);
-
+    const updateInterval = useRef(null);
+    const scrollAdjustment = useRef(1);
     useEffect(() => {
         if (currentAreaRef.current) {
             currentAreaRef.current.measure((x, y, width, height, pageX, pageY) => {
                 onDimensionsChange({ x: pageX, y: pageY, width, height });
+                initPosition.current = riverSegments.totalHeight - height;
+                scrollPosition.current = initPosition.current;
+                setRenderedScrollPosition(initPosition.current);
+                if (onScrollPositionChange) {
+                    onScrollPositionChange(scrollPosition.current);
+                }
+                updateInterval.current = (1000 / height) * (100 / speed);
+
+                if (updateInterval.current < 10) {
+                    scrollAdjustment.current = Math.round(10 / updateInterval.current);
+                    updateInterval.curent = 1;
+                } else {
+                    updateInterval.current = Math.round(updateInterval.current);
+                }
+
+                updateInterval.current = Math.max(Math.floor(updateInterval.current), 1);
             });
         }
     }, []);
@@ -44,49 +60,33 @@ const ScrollingBackground = ({
     );
 
     useEffect(() => {
-        scrollPosition.current = SCROLL_INITIAL_POSITION;
-        setRenderedScrollPosition(SCROLL_INITIAL_POSITION); // Trigger re-render
+        scrollPosition.current = initPosition.current;
+        setRenderedScrollPosition(initPosition.current);
+        if (onScrollPositionChange) {
+            onScrollPositionChange(scrollPosition.current);
+        }
     }, [resetFlag]);
-
-    let updateInterval = (1000 / height) * (100 / speed);
-    let scrollAdjustment = 1;
-
-    if (updateInterval < 1) {
-        scrollAdjustment = Math.round(1 / updateInterval);
-        updateInterval = 1;
-    } else {
-        updateInterval = Math.round(updateInterval);
-    }
-
-    updateInterval = Math.max(Math.floor(updateInterval), 1); // Clamp between 16ms and 1000ms
-
-    const prevDependencies = useRef({ isGameRunning, speed });
 
     useEffect(() => {
         if (isGameRunning) {
-            // Start scrolling
             intervalRef.current = setInterval(() => {
-                scrollPosition.current -= scrollAdjustment;
+                scrollPosition.current -= scrollAdjustment.current;
 
-                if (scrollPosition.current < 0) {
-                    scrollPosition.current = SCROLL_INITIAL_POSITION;
+                if (!scrollPosition.current || scrollPosition.current < 0) {
+                    scrollPosition.current = initPosition.current;
                 }
 
                 setRenderedScrollPosition(scrollPosition.current); // Trigger re-render
-
                 if (onScrollPositionChange) {
                     onScrollPositionChange(scrollPosition.current);
                 }
-            }, updateInterval);
+            }, updateInterval.current);
         } else {
-            // Stop scrolling
             if (intervalRef.current) {
                 clearInterval(intervalRef.current);
                 intervalRef.current = null;
             }
         }
-
-        prevDependencies.current = { isGameRunning, speed };
 
         return () => {
             if (intervalRef.current) {
@@ -99,8 +99,8 @@ const ScrollingBackground = ({
     return (
         <View
             style={{
-                width,
-                height,
+                width: "100%",
+                height: "100%",
                 backgroundColor: 'lightblue',
                 overflow: 'hidden',
             }}
