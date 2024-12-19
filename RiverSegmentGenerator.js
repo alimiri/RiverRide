@@ -83,33 +83,46 @@ export default function generateRiverSegments(
         }
 
         //generate briges
-        const bridge = {points: []};
-        const y1 = length / 2 - 50;
-        const y2 = length / 2 + 50;
-        const yIncrement = (y2 - y1) / 10;
+        const bridges = [];
+        if(true) {
+            const bridge = {points: []};
+            const y1 = length / 2 - 50;
+            const y2 = length / 2 + 50;
+            const yIncrement = (y2 - y1) / 10;
 
-        for(let j = 0; j < 10; j++) {
-            const aPoints = [];
-            aPoints.push({y: y1  + j * yIncrement, x: (screenWidth - startWidth - (endWidth - startWidth) * (y1  + j * yIncrement) / length) / 2});
-            aPoints.push({y: y1  + j * yIncrement, x: screenWidth - aPoints[0].x});
-            aPoints.push({y: y1  + (j + 1) * yIncrement, x: (screenWidth + startWidth + (endWidth - startWidth) * (y1  + (j + 1) * yIncrement) / length) / 2}),
-            aPoints.push({y: y1  + (j + 1) * yIncrement, x: screenWidth - aPoints[2].x});
-            bridge.points.push(aPoints);
+            for(let j = 0; j < 10; j++) {
+                const aPoints = [];
+                aPoints.push({y: y1  + j * yIncrement, x: (screenWidth - startWidth - (endWidth - startWidth) * (y1  + j * yIncrement) / length) / 2});
+                aPoints.push({y: y1  + j * yIncrement, x: screenWidth - aPoints[0].x});
+                aPoints.push({y: y1  + (j + 1) * yIncrement, x: (screenWidth + startWidth + (endWidth - startWidth) * (y1  + (j + 1) * yIncrement) / length) / 2}),
+                aPoints.push({y: y1  + (j + 1) * yIncrement, x: screenWidth - aPoints[2].x});
+                bridge.points.push(aPoints);
+            }
+            bridge.y1 = length / 2 - 100;
+            bridge.y2 = bridge.y1;
+            let interpolatedWidth = (screenWidth - startWidth - ((endWidth - startWidth) * bridge.y1) / length) / 2;
+            bridge.x1 = (screenWidth - interpolatedWidth) / 2;
+            bridge.x2 = bridge.x1 + interpolatedWidth;
+
+            bridge.y3 = length / 2 + 100;
+            bridge.y4 = bridge.y3;
+            interpolatedWidth = startWidth + ((endWidth - startWidth) * bridge.y3) / length;
+            bridge.x3 = (screenWidth - interpolatedWidth) / 2;
+            bridge.x4 = bridge.x3 + interpolatedWidth;
+
+            bridges.push(bridge);
         }
-        bridge.y1 = length / 2 - 100;
-        bridge.y2 = bridge.y1;
-        let interpolatedWidth = (screenWidth - startWidth - ((endWidth - startWidth) * bridge.y1) / length) / 2;
-        bridge.x1 = (screenWidth - interpolatedWidth) / 2;
-        bridge.x2 = bridge.x1 + interpolatedWidth;
 
-        bridge.y3 = length / 2 + 100;
-        bridge.y4 = bridge.y3;
-        interpolatedWidth = startWidth + ((endWidth - startWidth) * bridge.y3) / length;
-        bridge.x3 = (screenWidth - interpolatedWidth) / 2;
-        bridge.x4 = bridge.x3 + interpolatedWidth;
-
-        const bridges = [bridge];
-        const helicopters = [{startX: 100, y: 100, direction: 'ltr'}];
+        //generate helicopters
+        const helicopters = [];
+        if(true) {
+            let y = 500;//length / 4;
+            let helicopter = {x: (screenWidth - (endWidth - startWidth) * y / length) / 2, y: y, direction: 'ltr'};
+            helicopters.push(helicopter);
+            y = length * 3 / 4;
+            helicopter = {x: (screenWidth - startWidth - (endWidth - startWidth) * y / length) / 2, y: y, direction: 'rtl'};
+            helicopters.push(helicopter);
+        }
 
         // Push the segment (startWidth, endWidth, length, trees)
         segments.push({
@@ -123,7 +136,6 @@ export default function generateRiverSegments(
         });
         offset += length;
     }
-
     return {
         river: segments,
         totalHeight: segments.reduce((acc, segment) => acc + segment.length, 0),
