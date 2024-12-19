@@ -5,12 +5,13 @@ import MovementArea from './MovementArea'; // Import the new MovementArea
 import riverSegmentGenerator from './RiverSegmentGenerator'; // Import the riverSegmentGenerator
 import ScrollingBackground from './ScrollingBackground';  // Import the scrolling background
 import ShootButton from './ShootButton';
-import Svg, { Polygon } from 'react-native-svg';
+import LottieView from 'lottie-react-native';
+import { Audio } from 'expo-av';
 
 
 const AIRPLANE_WIDTH = 50; // Width of the airplane
 const AIRPLANE_HEIGHT = 50; // Height of the airplane
-const SPEED_INIT = 200;
+const SPEED_INIT = 500;
 const SPEED_MAX = 1500;
 const SPEED_MIN = 50;
 const SPEED_INCREASE_STEP = 1;
@@ -41,6 +42,9 @@ export default function App() {
   const endGameHandleRef = useRef(false);
   const [resetFlag, setResetFlag] = useState(false);
   const [resetRiver, setResetRiver] = useState(false);
+  const explosions = useRef([]);
+  const [explosionSound, setExplosionSound] = useState(null);
+  const isAirplaneVisible = useRef(true);
 
   const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
   const playerPosition = useRef(initialPosition);
@@ -83,11 +87,58 @@ export default function App() {
     }
   };
 
+  const Explosion = ({ x, y }) => {
+    return (
+      <LottieView
+        source={require('./assets/explosion.json')}
+        autoPlay
+        loop={false}
+        style={{
+          position: 'absolute',
+          width: 100,
+          height: 100,
+          left: x - 50, // Center the explosion
+          top: y - 50,
+        }}
+      />
+    );
+  };
+
+  // sound system
+  const soundRef = useRef(null); // Reference for sound instance
+
+  const stopSound = async () => {
+    if (soundRef.current) {
+      await soundRef.current.stopAsync();
+      await soundRef.current.unloadAsync();
+    }
+  };
+
+  const startSound = (effect) => {
+    const loadSound = async () => {
+      let soundEffect = null;
+      let params = null;
+      if(effect === 'airplane') {
+        soundEffect = require('./assets/airplane-engine.mp3');
+        params = { shouldPlay: true, isLooping: true };
+      } else {
+        soundEffect = require('./assets/explosion.mp3');
+        params = { shouldPlay: true, isLooping: false };
+      }
+      const { sound } = await Audio.Sound.createAsync(soundEffect, params);
+      soundRef.current = sound;
+    };
+
+    loadSound();
+  };
+
   const handleShoot = () => {
     if (!isGameRunning) {
       restartGame();
       setIsGameRunning(true);
+      startSound('airplane');
     }
+
     if (!world.current) {
       console.error('Matter.js world is not defined!');
       return;
@@ -147,7 +198,7 @@ export default function App() {
   };
 
   onScrollPositionChange = (scrollPosition) => {
-    if (!isGameRunning) return;
+    if (!isGameRunning || playerPosition.current.x === 0) return;
 
     // check for border collision
     bottomOfTheRiverRef.current = riverSegments.totalHeight - scrollPosition - screenHeight + movementViewDimensions.height + scrollingViewDimensions.y;
@@ -172,7 +223,11 @@ export default function App() {
 
         //check bridge collision
         const bridge = segment.bridges.find(bridge => {
-          if (airplaneYRelative >= bridge.points[0].y + segment.offset) {
+          if (airplaneYRelative >= bridge.points[0][0].y + segment.offset) {
+            stopSound();
+            startSound('explosion');
+            addExplosion(playerPosition.current.x, playerPosition.current.y, bottomOfTheRiverRef.current);
+            isAirplaneVisible.current = false;
             return true;
           }
         });
@@ -186,11 +241,24 @@ export default function App() {
     }
   };
 
+  const addExplosion = (x, y, refPosition) => {
+      explosions.current.push({ x, y, refPosition });
+      setTimeout(() => {
+        explosions.current.splice(0, 1);
+      }, 3000);
+  };
+
   const checkForCollision = (xPosition) => {
     if (!isGameRunning || endGameHandleRef.current) return true;
 
     if (xPosition < leftBorder.current + AIRPLANE_WIDTH / 2 || xPosition > rightBorder.current - AIRPLANE_WIDTH / 2) {
       handleEndGame('border');
+
+      isAirplaneVisible.current = false;
+      stopSound();
+      startSound('explosion');
+      addExplosion(playerPosition.current.x, playerPosition.current.y, bottomOfTheRiverRef.current);
+
       return true;
     }
 
@@ -222,6 +290,7 @@ export default function App() {
     setFuel(FUEL_INIT); // Reset fuel
     speed.current = SPEED_INIT; // Reset speed
     setResetFlag((prev) => !prev);
+    isAirplaneVisible.current = true;
   };
 
   useEffect(() => {
@@ -268,12 +337,16 @@ export default function App() {
                   const segment = riverSegments.river[i];
                   if (bulletYRelative < segment.offset + segment.length) {
                     const bridgeIndex = segment.bridges.findIndex(bridge => {
-                      if (bulletYRelative >= bridge.points[0].y + segment.offset) {
+                      if (bulletYRelative >= bridge.points[0][0].y + segment.offset) {
+                        //stopSound();
+                        startSound('explosion');
+                        addExplosion(bridge.points[5][0].x + (bridge.points[5][1].x - bridge.points[5][0].x) / 4 , bridge.points[5][0].y + segment.offset - bottomOfTheRiverRef.current, bottomOfTheRiverRef.current);
+                        addExplosion(bridge.points[5][0].x + (bridge.points[5][1].x - bridge.points[5][0].x) * 3 / 4 , bridge.points[5][0].y + segment.offset - bottomOfTheRiverRef.current, bottomOfTheRiverRef.current);
                         return true;
                       }
                     });
                     if (bridgeIndex >= 0) {
-                      segment.bridges.splice(bridgeIndex,1);
+                      segment.bridges.splice(bridgeIndex, 1);
                       setResetRiver((prev) => !prev);
                       return false;
                     }
@@ -286,12 +359,12 @@ export default function App() {
           });
         }
       }, 1000 / 60); // Update every frame
-    } else if(bulletMovementIntervalRef.current) {
+    } else if (bulletMovementIntervalRef.current) {
       clearInterval(bulletMovementIntervalRef.current);
       bulletMovementIntervalRef.current = null;
     }
     return () => {
-      if(bulletMovementIntervalRef.current) {
+      if (bulletMovementIntervalRef.current) {
         clearInterval(bulletMovementIntervalRef.current);
         bulletMovementIntervalRef.current = null;
       }
@@ -335,10 +408,19 @@ export default function App() {
             resetRiver={resetRiver}
           />
           )}
-          <Image
-            source={require('./assets/airplane.png')}
-            style={[memoizedStyles.airplane, { left: playerPosition.current.x - AIRPLANE_WIDTH / 2, top: playerPosition.current.y - AIRPLANE_HEIGHT / 2 }]}
-          />
+          {isAirplaneVisible.current && (
+            <Image
+              source={require('./assets/airplane.png')}
+              style={[
+                memoizedStyles.airplane,
+                {
+                  left: playerPosition.current.x - AIRPLANE_WIDTH / 2,
+                  top: playerPosition.current.y - AIRPLANE_HEIGHT / 2,
+                },
+              ]}
+            />
+          )}
+
           {bullets.map((bullet, index) => {
             return (<View
               key={index}
@@ -353,6 +435,9 @@ export default function App() {
             />
             );
           })}
+          {explosions.current.map((explosion, index) => (
+            <Explosion key={index} x={explosion.x} y={explosion.y - explosion.refPosition + bottomOfTheRiverRef.current} />
+          ))}
         </View>
 
         <View style={memoizedStyles.controlsStrip}>

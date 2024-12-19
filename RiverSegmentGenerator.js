@@ -84,14 +84,18 @@ export default function generateRiverSegments(
 
         //generate briges
         const bridge = {points: []};
-        const y1 = length / 2 - 100;
-        const y2 = length / 2 + 100;
+        const y1 = length / 2 - 50;
+        const y2 = length / 2 + 50;
+        const yIncrement = (y2 - y1) / 10;
 
-        bridge.points.push({y: y1, x: (screenWidth - startWidth - (endWidth - startWidth) * y1 / length) / 2});
-        bridge.points.push({y: y1, x: screenWidth - bridge.points[0].x});
-        bridge.points.push({y: y2, x: (screenWidth + startWidth + (endWidth - startWidth) * y2 / length) / 2});
-        bridge.points.push({y: y2, x: screenWidth - bridge.points[2].x});
-
+        for(let j = 0; j < 10; j++) {
+            const aPoints = [];
+            aPoints.push({y: y1  + j * yIncrement, x: (screenWidth - startWidth - (endWidth - startWidth) * (y1  + j * yIncrement) / length) / 2});
+            aPoints.push({y: y1  + j * yIncrement, x: screenWidth - aPoints[0].x});
+            aPoints.push({y: y1  + (j + 1) * yIncrement, x: (screenWidth + startWidth + (endWidth - startWidth) * (y1  + (j + 1) * yIncrement) / length) / 2}),
+            aPoints.push({y: y1  + (j + 1) * yIncrement, x: screenWidth - aPoints[2].x});
+            bridge.points.push(aPoints);
+        }
         bridge.y1 = length / 2 - 100;
         bridge.y2 = bridge.y1;
         let interpolatedWidth = (screenWidth - startWidth - ((endWidth - startWidth) * bridge.y1) / length) / 2;

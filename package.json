@@ -19,7 +19,8 @@
     "react-native-game-engine": "^1.2.0",
     "react-native-sound": "^0.11.2",
     "react-native-svg": "^15.8.0",
-    "sharp": "^0.33.5"
+    "sharp": "^0.33.5",
+    "lottie-react-native": "7.1.0"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",
