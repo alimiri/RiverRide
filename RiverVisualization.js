@@ -58,62 +58,6 @@ function RiverVisualization({ width, riverSegments, treeImage }) {
         });
         return bridges;
     };
-/*
-    const renderBridges = () => {
-        const NUMBER_OF_SECTIONS = 10; // Total sections to divide into
-        const SECTION_COLORS = ["darkBlue", "darkgreen"]; // Colors for the middle sections
-
-        let bridges = [];
-        riverSegments.river.forEach((segment, segmentIndex) => {
-            segment.bridges.forEach((bridge, bridgeIndex) => {
-                const [p1, p2, p3, p4] = bridge.points; // Destructure the 4 points
-
-                // Calculate the vertical height of each section
-                const bridgeHeight = p3.y - p1.y;
-                const sectionHeight = bridgeHeight / NUMBER_OF_SECTIONS;
-
-                // Generate sections
-                for (let i = 0; i < NUMBER_OF_SECTIONS; i++) {
-                    const sectionTopY = p1.y + i * sectionHeight;
-                    const sectionBottomY = sectionTopY + sectionHeight;
-
-                    // Determine the color for this section
-                    const fillColor =
-                        i === 0 || i === NUMBER_OF_SECTIONS - 1
-                            ? "brown" // Top and bottom sections are brown
-                            : SECTION_COLORS[(i - 1) % SECTION_COLORS.length]; // Alternate green colors for middle sections
-
-                    // Define the points for the current section
-                    const sectionPoints = [
-                        { x: p1.x, y: sectionTopY },
-                        { x: p2.x, y: sectionTopY },
-                        { x: p3.x, y: sectionBottomY },
-                        { x: p4.x, y: sectionBottomY },
-                    ];
-                    const polygonPoints = sectionPoints.map((p) => `${p.x},${p.y}`).join(" ");
-
-                    // Add the section as an SVG polygon
-                    bridges.push(
-                        <Svg
-                            key={`bridge-${segmentIndex}-${bridgeIndex}-section-${i}`}
-                            style={{
-                                position: "absolute",
-                                left: 0,
-                                top: segment.offset,
-                                width: "100%",
-                                height: segment.length,
-                                zIndex: 100,
-                            }}
-                        >
-                            <Polygon points={polygonPoints} fill={fillColor} />
-                        </Svg>
-                    );
-                }
-            });
-        });
-        return bridges;
-    };
-*/
     const renderTrees = () => {
         let trees = [];
         riverSegments.river.forEach((segment, segmentIndex) => {
@@ -199,7 +143,7 @@ function RiverVisualization({ width, riverSegments, treeImage }) {
             })}
             {renderTrees()}
             {renderBridges()}
-            {/*renderRuler()*/}
+            {renderRuler()}
         </View>
     );
 }
