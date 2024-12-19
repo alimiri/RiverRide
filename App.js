@@ -9,8 +9,8 @@ import LottieView from 'lottie-react-native';
 import { Audio } from 'expo-av';
 
 
-const AIRPLANE_WIDTH = 50; // Width of the airplane
-const AIRPLANE_HEIGHT = 50; // Height of the airplane
+const AIRPLANE_SIZE = { width: 50, height: 50 };
+const HELICOPTER_SIZE = { width: 50, height: 50 };
 const SPEED_INIT = 500;
 const SPEED_MAX = 1500;
 const SPEED_MIN = 50;
@@ -20,8 +20,7 @@ const SPEED_BACK_TIMING = 100;
 const FUEL_INIT = 100;
 
 const BULLET_SPEED = 5;
-const BULLET_WIDTH = 2;
-const BULLET_HEIGHT = 3;
+const BULLET_SIZE = { width: 2, height: 3 };
 
 let initialPosition = { x: 0, y: 0 };
 
@@ -53,19 +52,19 @@ export default function App() {
   const memoizedStyles = useMemo(() => styles(screenWidth, screenHeight), [screenWidth, screenHeight]);
 
   const RIVER_MAX_WIDTH_RATIO = screenWidth * 0.9; // Maximum width of the river
-  const RIVER_MIN_WIDTH_RATIO = AIRPLANE_WIDTH * 2; // Maximum width of the river
+  const RIVER_MIN_WIDTH_RATIO = AIRPLANE_SIZE.width * 2; // Maximum width of the river
 
   const entitiesRef = useRef(null);  // Ref to store entities
 
   const handleScrollingBackgroundDimensionsChange = (layout) => {
     setScrollingViewDimensions(layout);
-    initialPosition = { x: screenWidth / 2, y: movementViewDimensions.y - layout.y - 50 - AIRPLANE_HEIGHT / 2 };
+    initialPosition = { x: screenWidth / 2, y: movementViewDimensions.y - layout.y - 50 - AIRPLANE_SIZE.height / 2 };
     playerPosition.current = initialPosition;
   };
 
   const handleMovementAreaDimensionsChange = (layout) => {
     setMovementViewDimensions(layout);
-    initialPosition = { x: screenWidth / 2, y: layout.y - scrollingViewDimensions.y - 50 - AIRPLANE_HEIGHT / 2 };
+    initialPosition = { x: screenWidth / 2, y: layout.y - scrollingViewDimensions.y - 50 - AIRPLANE_SIZE.height / 2 };
     playerPosition.current = initialPosition;
   };
 
@@ -146,9 +145,9 @@ export default function App() {
     // Create the bullet
     const bullet = Matter.Bodies.rectangle(
       playerPosition.current.x,
-      playerPosition.current.y - AIRPLANE_HEIGHT / 2,
-      BULLET_WIDTH,
-      BULLET_HEIGHT,
+      playerPosition.current.y - AIRPLANE_SIZE.height / 2,
+      BULLET_SIZE.width,
+      BULLET_SIZE.height,
       {
         isStatic: false,
         render: { fillStyle: 'red' },
@@ -189,7 +188,7 @@ export default function App() {
 
     entitiesRef.current = {
       physics: { engine: engine.current, world: world.current },
-      player: { body: player, size: [50, 50], color: "blue", renderer: AirplaneImage },
+      player: { body: player, size: [50, 50], color: "blue" },
       screenWidth,
       screenHeight,
     };
@@ -202,7 +201,7 @@ export default function App() {
 
     // check for border collision
     bottomOfTheRiverRef.current = riverSegments.totalHeight - scrollPosition - screenHeight + movementViewDimensions.height + scrollingViewDimensions.y;
-    const airplaneYRelative = bottomOfTheRiverRef.current + 50 + AIRPLANE_HEIGHT;
+    const airplaneYRelative = bottomOfTheRiverRef.current + 50 + AIRPLANE_SIZE.height;
     setAirplaneYRelative(airplaneYRelative);
     for (let i = 0; i < riverSegments.river.length; i++) {
       const segment = riverSegments.river[i];
@@ -215,9 +214,9 @@ export default function App() {
         rightBorder.current = leftBorder.current + widthAtY;
 
         //stick to the left border
-        //playerPosition.current = {x: leftBorder.current + AIRPLANE_WIDTH / 2, y: initialPosition.y};
+        //playerPosition.current = {x: leftBorder.current + AIRPLANE_SIZE.width / 2, y: initialPosition.y};
         //stick to the right border
-        //playerPosition.current = {x: rightBorder.current - AIRPLANE_WIDTH / 2, y: initialPosition.y};
+        //playerPosition.current = {x: rightBorder.current - AIRPLANE_SIZE.width / 2, y: initialPosition.y};
 
         checkForCollision(playerPosition.current.x);
 
@@ -242,16 +241,16 @@ export default function App() {
   };
 
   const addExplosion = (x, y, refPosition) => {
-      explosions.current.push({ x, y, refPosition });
-      setTimeout(() => {
-        explosions.current.splice(0, 1);
-      }, 3000);
+    explosions.current.push({ x, y, refPosition });
+    setTimeout(() => {
+      explosions.current.splice(0, 1);
+    }, 3000);
   };
 
   const checkForCollision = (xPosition) => {
     if (!isGameRunning || endGameHandleRef.current) return true;
 
-    if (xPosition < leftBorder.current + AIRPLANE_WIDTH / 2 || xPosition > rightBorder.current - AIRPLANE_WIDTH / 2) {
+    if (xPosition < leftBorder.current + AIRPLANE_SIZE.width / 2 || xPosition > rightBorder.current - AIRPLANE_SIZE.width / 2) {
       handleEndGame('border');
 
       isAirplaneVisible.current = false;
@@ -291,6 +290,9 @@ export default function App() {
     speed.current = SPEED_INIT; // Reset speed
     setResetFlag((prev) => !prev);
     isAirplaneVisible.current = true;
+    //const segments = riverSegmentGenerator(screenWidth, RIVER_MIN_WIDTH_RATIO, RIVER_MAX_WIDTH_RATIO, screenHeight / 2, screenHeight * 5, 100, 50, { seedW: 1, seedH: 2, seedTree: 3, seedBridge: 1, seedHelicopter: 10 });
+    //setRiverSegments(segments);
+    //setResetRiver((prev) => !prev);
   };
 
   useEffect(() => {
@@ -332,7 +334,7 @@ export default function App() {
               })
               .filter((bullet) => {
                 //check for bullet to the bridge collision
-                const bulletYRelative = bottomOfTheRiverRef.current + 50 + AIRPLANE_HEIGHT + playerPosition.current.y - AIRPLANE_HEIGHT / 2 - bullet.position.y;
+                const bulletYRelative = bottomOfTheRiverRef.current + 50 + AIRPLANE_SIZE.height + playerPosition.current.y - AIRPLANE_SIZE.height / 2 - bullet.position.y;
                 for (let i = 0; i < riverSegments.river.length; i++) {
                   const segment = riverSegments.river[i];
                   if (bulletYRelative < segment.offset + segment.length) {
@@ -340,8 +342,8 @@ export default function App() {
                       if (bulletYRelative >= bridge.points[0][0].y + segment.offset) {
                         //stopSound();
                         startSound('explosion');
-                        addExplosion(bridge.points[5][0].x + (bridge.points[5][1].x - bridge.points[5][0].x) / 4 , bridge.points[5][0].y + segment.offset - bottomOfTheRiverRef.current, bottomOfTheRiverRef.current);
-                        addExplosion(bridge.points[5][0].x + (bridge.points[5][1].x - bridge.points[5][0].x) * 3 / 4 , bridge.points[5][0].y + segment.offset - bottomOfTheRiverRef.current, bottomOfTheRiverRef.current);
+                        addExplosion(bridge.points[5][0].x + (bridge.points[5][1].x - bridge.points[5][0].x) / 4, bridge.points[5][0].y + segment.offset - bottomOfTheRiverRef.current, bottomOfTheRiverRef.current);
+                        addExplosion(bridge.points[5][0].x + (bridge.points[5][1].x - bridge.points[5][0].x) * 3 / 4, bridge.points[5][0].y + segment.offset - bottomOfTheRiverRef.current, bottomOfTheRiverRef.current);
                         return true;
                       }
                     });
@@ -408,19 +410,20 @@ export default function App() {
             resetRiver={resetRiver}
           />
           )}
+          {/* airplane */}
           {isAirplaneVisible.current && (
             <Image
               source={require('./assets/airplane.png')}
               style={[
                 memoizedStyles.airplane,
                 {
-                  left: playerPosition.current.x - AIRPLANE_WIDTH / 2,
-                  top: playerPosition.current.y - AIRPLANE_HEIGHT / 2,
+                  left: playerPosition.current.x - AIRPLANE_SIZE.width / 2,
+                  top: playerPosition.current.y - AIRPLANE_SIZE.height / 2,
                 },
               ]}
             />
           )}
-
+          {/* bullets */}
           {bullets.map((bullet, index) => {
             return (<View
               key={index}
@@ -428,11 +431,36 @@ export default function App() {
                 position: 'absolute',
                 left: bullet.position.x,
                 top: bullet.position.y,
-                width: BULLET_WIDTH,
-                height: BULLET_HEIGHT,
+                width: BULLET_SIZE.width,
+                height: BULLET_SIZE.height,
                 backgroundColor: 'red',
               }}
             />
+            );
+          })}
+          {/* helicopters */}
+          {riverSegments.river.filter((segment, index) => segment.offset + segment.length >= bottomOfTheRiverRef.current && segment.offset <= bottomOfTheRiverRef.current + movementViewDimensions.y - scrollingViewDimensions.y).
+            map((segment, index) => {
+            return (
+              <View key={`Helicopter-${index}`}>
+                {segment.helicopters.map((helicopter, index2) => {
+                  //if(index === 0)
+                    //console.log(movementViewDimensions.y, helicopter.y, segment.offset, bottomOfTheRiverRef.current, movementViewDimensions.y - scrollingViewDimensions.y - (helicopter.y + segment.offset - bottomOfTheRiverRef.current));
+                  return (
+                    <Image
+                      key={`Helicopter-${index}-${index2}`}
+                      source={require('./assets/helicopter.png')}
+                      style={{
+                          position: 'absolute',
+                          width: HELICOPTER_SIZE.width,
+                          height: HELICOPTER_SIZE.width,
+                          left: helicopter.x,
+                          top: movementViewDimensions.y - scrollingViewDimensions.y - (helicopter.y + segment.offset - bottomOfTheRiverRef.current),
+                        }}
+                    />
+                  );
+                })}
+              </View>
             );
           })}
           {explosions.current.map((explosion, index) => (
@@ -454,32 +482,6 @@ export default function App() {
     </View>
   );
 }
-
-const Physics = (entities, { time, events }) => {
-  let { engine } = entities.physics;
-  const { screenWidth, screenHeight } = entities;
-
-  Matter.Engine.update(engine, time.delta);
-
-  return entities;
-};
-
-const AirplaneImage = ({ body, size }) => {
-  const x = body.position.x - size[0] / 2;
-  const y = body.position.y - size[1] / 2;
-  return (
-    <Image
-      source={require('./assets/airplane.png')}
-      style={{
-        position: 'absolute',
-        left: x,
-        top: y,
-        width: size[0],
-        height: size[1],
-      }}
-    />
-  );
-};
 
 const styles = (screenWidth, screenHeight) => ({
   container: { flex: 1, backgroundColor: 'black' },
@@ -507,8 +509,8 @@ const styles = (screenWidth, screenHeight) => ({
   },
   airplane: {
     position: 'absolute',
-    width: AIRPLANE_WIDTH,
-    height: AIRPLANE_WIDTH,
+    width: AIRPLANE_SIZE.width,
+    height: AIRPLANE_SIZE.width,
   },
 
   controlsStrip: {
