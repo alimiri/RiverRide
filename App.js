@@ -7,6 +7,11 @@ import ScrollingBackground from './ScrollingBackground';  // Import the scrollin
 import ShootButton from './ShootButton';
 import LottieView from 'lottie-react-native';
 import { Audio } from 'expo-av';
+import Svg, { Polygon } from 'react-native-svg';
+
+import airplaneImage from './assets/airplane.png';
+import helicopterLtrImage from './assets/helicopter-ltr.png';
+import helicopterRtlImage from './assets/helicopter-rtl.png';
 
 
 const AIRPLANE_SIZE = { width: 50, height: 50 };
@@ -40,7 +45,6 @@ export default function App() {
   const rightBorder = useRef(0);
   const endGameHandleRef = useRef(false);
   const [resetFlag, setResetFlag] = useState(false);
-  const [resetRiver, setResetRiver] = useState(false);
   const explosions = useRef([]);
   const [explosionSound, setExplosionSound] = useState(null);
   const isAirplaneVisible = useRef(true);
@@ -290,9 +294,7 @@ export default function App() {
     speed.current = SPEED_INIT; // Reset speed
     setResetFlag((prev) => !prev);
     isAirplaneVisible.current = true;
-    //const segments = riverSegmentGenerator(screenWidth, RIVER_MIN_WIDTH_RATIO, RIVER_MAX_WIDTH_RATIO, screenHeight / 2, screenHeight * 5, 100, 50, { seedW: 1, seedH: 2, seedTree: 3, seedBridge: 1, seedHelicopter: 10 });
-    //setRiverSegments(segments);
-    //setResetRiver((prev) => !prev);
+    initSegment();
   };
 
   useEffect(() => {
@@ -349,7 +351,6 @@ export default function App() {
                     });
                     if (bridgeIndex >= 0) {
                       segment.bridges.splice(bridgeIndex, 1);
-                      setResetRiver((prev) => !prev);
                       return false;
                     }
                     break;
@@ -358,6 +359,23 @@ export default function App() {
                 return bullet.position.y > 0
               }); // Remove bullets that move off screen
             return newBullets;
+          });
+
+          // helicopter movement
+          segmentsInRange().forEach(segment => {
+            segment.helicopters.forEach(helicopter => {
+              if (helicopter.direction === 'ltr') {
+                helicopter.x += 1;
+                if (helicopter.x + HELICOPTER_SIZE.width >= screenWidth) {
+                  helicopter.direction = 'rtl';
+                }
+              } else {
+                helicopter.x -= 1;
+                if (helicopter.x <= 0) {
+                  helicopter.direction = 'ltr';
+                }
+              }
+            });
           });
         }
       }, 1000 / 60); // Update every frame
@@ -373,17 +391,81 @@ export default function App() {
     }
   }, [isGameRunning]);
 
-  // Function to generate and update river segments
-  useEffect(() => {
+  const initSegment = () => {
+    const segments = riverSegmentGenerator(screenWidth, RIVER_MIN_WIDTH_RATIO, RIVER_MAX_WIDTH_RATIO, screenHeight / 2, screenHeight * 5, 100, 50, { seedW: 1, seedH: 2, seedTree: 3, seedBridge: 1, seedHelicopter: 10 }, HELICOPTER_SIZE.width);
+    setRiverSegments(segments);
+};
+
+useEffect(() => {
     const generateRiver = () => {
-      const segments = riverSegmentGenerator(screenWidth, RIVER_MIN_WIDTH_RATIO, RIVER_MAX_WIDTH_RATIO, screenHeight / 2, screenHeight * 5, 100, 50, { seedW: 1, seedH: 2, seedTree: 3, seedBridge: 1, seedHelicopter: 10 });
-      setRiverSegments(segments);
+      initSegment();
     };
 
     generateRiver();
   }, [screenWidth, screenHeight]);
 
   useRef(setupWorld()).current;
+
+  const segmentsInRange = () => riverSegments.river.filter(segment => segment.offset + segment.length >= bottomOfTheRiverRef.current && segment.offset <= bottomOfTheRiverRef.current + movementViewDimensions.y - scrollingViewDimensions.y);
+
+  const mapY = y => movementViewDimensions.y - scrollingViewDimensions.y - (y - bottomOfTheRiverRef.current);
+
+  const renderBridges = () => {
+      const SECTION_COLORS = ["navy", "darkgreen"]; // Colors for the middle sections
+      let bridges = [];
+      segmentsInRange().forEach((segment, segmentIndex) => {
+          segment.bridges.forEach((bridge, bridgeIndex) => {
+              const n = bridge.points.length;
+              for (let i = 0; i < n; i++) {
+                  const polygonPoints = bridge.points[i].map((p) => `${p.x},${mapY(p.y)}`).join(' ');
+                  const fillColor =
+                      i === 0 || i === n - 1
+                          ? "brown" // Top and bottom sections are brown
+                          : SECTION_COLORS[(i - 1) % SECTION_COLORS.length]; // Alternate green colors for middle sections
+                  bridges.push(
+                      <Svg
+                          key={`bridge-${segmentIndex}-${bridgeIndex}-${i}`}
+                          style={{
+                              position: 'absolute',
+                              left: 0,
+                              top: 0,
+                              width: '100%',
+                              height: segment.length,
+                              zIndex: 100,
+                          }}
+                      >
+                          <Polygon
+                              points={polygonPoints}
+                              fill={fillColor}
+                          />
+                      </Svg>
+                  );
+              }
+          });
+      });
+      return bridges;
+  };
+
+  const renderHelicopters = () =>
+    segmentsInRange().
+      map((segment, index) =>
+          segment.helicopters.map((helicopter, index2) => {
+            return (
+              <Image
+                key={`Helicopter-${index}-${index2}`}
+                source={helicopter.direction === 'ltr' ? helicopterLtrImage : helicopterRtlImage}
+                style={{
+                  position: 'absolute',
+                  width: HELICOPTER_SIZE.width,
+                  height: HELICOPTER_SIZE.height,
+                  left: helicopter.x,
+                  top: mapY(helicopter.y + segment.offset),
+                  zIndex: 0,
+                }}
+              />
+            );
+          })
+      );
 
   return (
     <View style={{ flex: 1, position: 'relative' }}>
@@ -407,13 +489,13 @@ export default function App() {
             onScrollPositionChange={onScrollPositionChange}
             onDimensionsChange={handleScrollingBackgroundDimensionsChange}
             resetFlag={resetFlag}
-            resetRiver={resetRiver}
           />
           )}
+          {renderBridges()}
           {/* airplane */}
           {isAirplaneVisible.current && (
             <Image
-              source={require('./assets/airplane.png')}
+              source={airplaneImage}
               style={[
                 memoizedStyles.airplane,
                 {
@@ -439,26 +521,7 @@ export default function App() {
             );
           })}
           {/* helicopters */}
-          {riverSegments.river.filter(segment => segment.offset + segment.length >= bottomOfTheRiverRef.current && segment.offset <= bottomOfTheRiverRef.current + movementViewDimensions.y - scrollingViewDimensions.y).
-            map((segment, index) =>
-                segment.helicopters.map((helicopter, index2) => {
-                  //console.log(movementViewDimensions.y, helicopter.x, helicopter.y, segment.offset, bottomOfTheRiverRef.current, movementViewDimensions.y - scrollingViewDimensions.y - (helicopter.y + segment.offset - bottomOfTheRiverRef.current));
-                  return (
-                    <Image
-                      key={`Helicopter-${index}-${index2}`}
-                      source={require('./assets/helicopter.png')}
-                      style={{
-                        position: 'absolute',
-                        width: HELICOPTER_SIZE.width,
-                        height: HELICOPTER_SIZE.height,
-                        left: helicopter.x,
-                        top: movementViewDimensions.y - scrollingViewDimensions.y - (helicopter.y + segment.offset - bottomOfTheRiverRef.current),
-                        zIndex: 0,
-                      }}
-                    />
-                  );
-                })
-            )}
+          {renderHelicopters()}
           {explosions.current.map((explosion, index) => (
             <Explosion key={index} x={explosion.x} y={explosion.y - explosion.refPosition + bottomOfTheRiverRef.current} />
           ))}

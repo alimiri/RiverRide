@@ -11,7 +11,6 @@ const ScrollingBackground = ({
     onScrollPositionChange,
     onDimensionsChange,
     resetFlag,
-    resetRiver,
 }) => {
     const currentAreaRef = useRef(null);
 
@@ -56,7 +55,7 @@ const ScrollingBackground = ({
                 />
             </View>
         ),
-        [width, riverSegments, resetRiver]
+        [width]
     );
 
     useEffect(() => {

@@ -23,41 +23,6 @@ const RiverSegment = ({ startWidth, endWidth, length, screenWidth, bridges }) =>
 };
 
 function RiverVisualization({ width, riverSegments, treeImage }) {
-    const renderBridges = () => {
-        const SECTION_COLORS = ["navy", "darkgreen"]; // Colors for the middle sections
-        let bridges = [];
-        riverSegments.river.forEach((segment, segmentIndex) => {
-            segment.bridges.forEach((bridge, bridgeIndex) => {
-                const n = bridge.points.length;
-                for (let i = 0; i < n; i++) {
-                    const polygonPoints = bridge.points[i].map((p) => `${p.x},${p.y}`).join(' ');
-                    const fillColor =
-                        i === 0 || i === n - 1
-                            ? "brown" // Top and bottom sections are brown
-                            : SECTION_COLORS[(i - 1) % SECTION_COLORS.length]; // Alternate green colors for middle sections
-                    bridges.push(
-                        <Svg
-                            key={`bridge-${segmentIndex}-${bridgeIndex}-${i}`}
-                            style={{
-                                position: 'absolute',
-                                left: 0,
-                                top: segment.offset,
-                                width: '100%',
-                                height: segment.length,
-                                zIndex: 100,
-                            }}
-                        >
-                            <Polygon
-                                points={polygonPoints}
-                                fill={fillColor}
-                            />
-                        </Svg>
-                    );
-                }
-            });
-        });
-        return bridges;
-    };
     const renderTrees = () => {
         let trees = [];
         riverSegments.river.forEach((segment, segmentIndex) => {
@@ -142,7 +107,6 @@ function RiverVisualization({ width, riverSegments, treeImage }) {
                 );
             })}
             {renderTrees()}
-            {renderBridges()}
             {renderRuler()}
         </View>
     );

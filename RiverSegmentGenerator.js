@@ -19,6 +19,7 @@ export default function generateRiverSegments(
     numSegments,
     treeWidth,
     seeds,
+    helicopterWidth,
 ) {
     const {seedW, seedH, seedTree, seedBridge, seedHelicopter} = seeds;
     const randomW = new SeededRandom(seedW); // Seeded RNG for width
@@ -116,11 +117,11 @@ export default function generateRiverSegments(
         //generate helicopters
         const helicopters = [];
         if(true) {
-            let y = 500;//length / 4;
-            let helicopter = {x: (screenWidth - (endWidth - startWidth) * y / length) / 2, y: y, direction: 'ltr'};
+            let y = length / 4;
+            let helicopter = {x: (screenWidth - (startWidth + (endWidth - startWidth) * y / length)) / 2, y: y, direction: 'ltr'};
             helicopters.push(helicopter);
             y = length * 3 / 4;
-            helicopter = {x: (screenWidth - startWidth - (endWidth - startWidth) * y / length) / 2, y: y, direction: 'rtl'};
+            helicopter = {x: screenWidth - (screenWidth - (startWidth + (endWidth - startWidth) * y / length)) / 2 - helicopterWidth, y: y, direction: 'rtl'};
             helicopters.push(helicopter);
         }
 
