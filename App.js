@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect, useMemo } from 'react';
-import { View, Text, Dimensions, Image, Alert } from 'react-native';
+import { View, Text, Dimensions, Image, Alert, TouchableWithoutFeedbackBase } from 'react-native';
 import Matter from 'matter-js';
 import MovementArea from './MovementArea'; // Import the new MovementArea
 import riverSegmentGenerator from './RiverSegmentGenerator'; // Import the riverSegmentGenerator
@@ -121,7 +121,7 @@ export default function App() {
     const loadSound = async () => {
       let soundEffect = null;
       let params = null;
-      if(effect === 'airplane') {
+      if (effect === 'airplane') {
         soundEffect = require('./assets/airplane-engine.mp3');
         params = { shouldPlay: true, isLooping: true };
       } else {
@@ -140,6 +140,7 @@ export default function App() {
       restartGame();
       setIsGameRunning(true);
       startSound('airplane');
+      return;
     }
 
     if (!world.current) {
@@ -201,14 +202,12 @@ export default function App() {
   };
 
   onScrollPositionChange = (scrollPosition) => {
-    if (!isGameRunning || playerPosition.current.x === 0) return;
-
-    // check for border collision
-    bottomOfTheRiverRef.current = riverSegments.totalHeight - scrollPosition - screenHeight + movementViewDimensions.height + scrollingViewDimensions.y;
+    bottomOfTheRiverRef.current = scrollingViewDimensions.height ? riverSegments.totalHeight - scrollingViewDimensions.height - scrollPosition : 0;
     const airplaneYRelative = bottomOfTheRiverRef.current + 50 + AIRPLANE_SIZE.height;
     setAirplaneYRelative(airplaneYRelative);
-    for (let i = 0; i < riverSegments.river.length; i++) {
-      const segment = riverSegments.river[i];
+    let _segment;
+    segmentsInRange().forEach(segment => {
+      _segment = segment;
       if (airplaneYRelative < segment.offset + segment.length) {
         const y = airplaneYRelative - segment.offset;
 
@@ -221,26 +220,45 @@ export default function App() {
         //playerPosition.current = {x: leftBorder.current + AIRPLANE_SIZE.width / 2, y: initialPosition.y};
         //stick to the right border
         //playerPosition.current = {x: rightBorder.current - AIRPLANE_SIZE.width / 2, y: initialPosition.y};
-
-        checkForCollision(playerPosition.current.x);
-
-        //check bridge collision
-        const bridge = segment.bridges.find(bridge => {
-          if (airplaneYRelative >= bridge.points[0][0].y + segment.offset) {
-            stopSound();
-            startSound('explosion');
-            addExplosion(playerPosition.current.x, playerPosition.current.y, bottomOfTheRiverRef.current);
-            isAirplaneVisible.current = false;
-            return true;
-          }
-        });
-        if (bridge) {
-          handleEndGame('bridge');
-          return true;
-        }
-
-        break;
       }
+    });
+    if (!isGameRunning || playerPosition.current.x === 0) return;
+    // check for border collision
+    checkForCollision(playerPosition.current.x);
+
+    //check bridge collision
+    const bridge = _segment.bridges.find(bridge => {
+      if (!bridge.destroyed && airplaneYRelative >= bridge.points[0][0].y + _segment.offset) {
+        stopSound();
+        startSound('explosion');
+        addExplosion(playerPosition.current.x, playerPosition.current.y, bottomOfTheRiverRef.current);
+        isAirplaneVisible.current = false;
+        return true;
+      }
+    });
+    if (bridge) {
+      handleEndGame('bridge');
+      return true;
+    }
+    //check helicopter collision
+    const helicopter = _segment.helicopters.find(helicopter => {
+      if (!helicopter.destroyed
+        && airplaneYRelative >= helicopter.y + _segment.offset
+        && airplaneYRelative <= helicopter.y + _segment.offset + HELICOPTER_SIZE.height
+        //&& playerPosition.x >= helicopter.x - HELICOPTER_SIZE.width / 2
+        //&& playerPosition.x <= helicopter.x + HELICOPTER_SIZE.width / 2
+      ){
+        stopSound();
+        startSound('explosion');
+        addExplosion(playerPosition.current.x, playerPosition.current.y, bottomOfTheRiverRef.current);
+        addExplosion(helicopter.x, helicopter.y, bottomOfTheRiverRef.current);
+        isAirplaneVisible.current = false;
+        return true;
+      }
+    });
+    if (helicopter) {
+      handleEndGame('helicopter');
+      return true;
     }
   };
 
@@ -294,7 +312,12 @@ export default function App() {
     speed.current = SPEED_INIT; // Reset speed
     setResetFlag((prev) => !prev);
     isAirplaneVisible.current = true;
-    initSegment();
+    //restore bridges and helicopters
+    riverSegments.river.forEach(segment => {
+      segment.bridges.forEach(bridge => {bridge.destroyed = false;});
+      segment.helicopters.forEach(helicopter => {helicopter.destroyed = false;});
+    });
+    setBullets(() => []);
   };
 
   useEffect(() => {
@@ -335,28 +358,46 @@ export default function App() {
                 return bullet;
               })
               .filter((bullet) => {
-                //check for bullet to the bridge collision
                 const bulletYRelative = bottomOfTheRiverRef.current + 50 + AIRPLANE_SIZE.height + playerPosition.current.y - AIRPLANE_SIZE.height / 2 - bullet.position.y;
-                for (let i = 0; i < riverSegments.river.length; i++) {
-                  const segment = riverSegments.river[i];
-                  if (bulletYRelative < segment.offset + segment.length) {
-                    const bridgeIndex = segment.bridges.findIndex(bridge => {
-                      if (bulletYRelative >= bridge.points[0][0].y + segment.offset) {
-                        //stopSound();
-                        startSound('explosion');
-                        addExplosion(bridge.points[5][0].x + (bridge.points[5][1].x - bridge.points[5][0].x) / 4, bridge.points[5][0].y + segment.offset - bottomOfTheRiverRef.current, bottomOfTheRiverRef.current);
-                        addExplosion(bridge.points[5][0].x + (bridge.points[5][1].x - bridge.points[5][0].x) * 3 / 4, bridge.points[5][0].y + segment.offset - bottomOfTheRiverRef.current, bottomOfTheRiverRef.current);
-                        return true;
-                      }
-                    });
-                    if (bridgeIndex >= 0) {
-                      segment.bridges.splice(bridgeIndex, 1);
-                      return false;
+                let found = false;
+                segmentsInRange().forEach(segment => {
+                //check for bullet to the bridge collision
+                  const bridgeIndex = segment.bridges.findIndex(bridge => {
+                    if (!bridge.destroyed && bulletYRelative >= bridge.points[0][0].y + segment.offset) {
+                      //stopSound();
+                      startSound('explosion');
+                      addExplosion(bridge.points[5][0].x + (bridge.points[5][1].x - bridge.points[5][0].x) / 4, bridge.points[5][0].y + segment.offset - bottomOfTheRiverRef.current, bottomOfTheRiverRef.current);
+                      addExplosion(bridge.points[5][0].x + (bridge.points[5][1].x - bridge.points[5][0].x) * 3 / 4, bridge.points[5][0].y + segment.offset - bottomOfTheRiverRef.current, bottomOfTheRiverRef.current);
+                      return true;
                     }
-                    break;
+                  });
+                  if (bridgeIndex >= 0) {
+                    segment.bridges[bridgeIndex].destroyed = true;
+                    found = true;
                   }
-                }
-                return bullet.position.y > 0
+
+                  //check for bullet to the helicopter collision
+                  const helicopterIndex = segment.helicopters.findIndex(helicopter => {
+                    if (!helicopter.destroyed &&
+                        bulletYRelative >= helicopter.y + segment.offset &&
+                        bulletYRelative <= helicopter.y + segment.offset + HELICOPTER_SIZE.height &&
+                        bullet.position.x >= helicopter.x - HELICOPTER_SIZE.width / 2 &&
+                        bullet.position.x <= helicopter.x + HELICOPTER_SIZE.width / 2) {
+                      //stopSound();
+                      startSound('explosion');
+                      addExplosion(bullet.position.x, bullet.position.y, bottomOfTheRiverRef.current);
+                      return true;
+                    }
+                  });
+                  if (helicopterIndex >= 0) {
+                    segment.helicopters[helicopterIndex].destroyed = true;
+                    found = true;
+                  }
+
+
+                });
+
+                return !found && bullet.position.y > 0
               }); // Remove bullets that move off screen
             return newBullets;
           });
@@ -366,12 +407,12 @@ export default function App() {
             segment.helicopters.forEach(helicopter => {
               if (helicopter.direction === 'ltr') {
                 helicopter.x += 1;
-                if (helicopter.x + HELICOPTER_SIZE.width >= screenWidth) {
+                if (helicopter.x + HELICOPTER_SIZE.width >= rightBorder.current) {
                   helicopter.direction = 'rtl';
                 }
               } else {
                 helicopter.x -= 1;
-                if (helicopter.x <= 0) {
+                if (helicopter.x <= leftBorder.current) {
                   helicopter.direction = 'ltr';
                 }
               }
@@ -394,9 +435,9 @@ export default function App() {
   const initSegment = () => {
     const segments = riverSegmentGenerator(screenWidth, RIVER_MIN_WIDTH_RATIO, RIVER_MAX_WIDTH_RATIO, screenHeight / 2, screenHeight * 5, 100, 50, { seedW: 1, seedH: 2, seedTree: 3, seedBridge: 1, seedHelicopter: 10 }, HELICOPTER_SIZE.width);
     setRiverSegments(segments);
-};
+  };
 
-useEffect(() => {
+  useEffect(() => {
     const generateRiver = () => {
       initSegment();
     };
@@ -411,60 +452,49 @@ useEffect(() => {
   const mapY = y => movementViewDimensions.y - scrollingViewDimensions.y - (y - bottomOfTheRiverRef.current);
 
   const renderBridges = () => {
-      const SECTION_COLORS = ["navy", "darkgreen"]; // Colors for the middle sections
-      let bridges = [];
-      segmentsInRange().forEach((segment, segmentIndex) => {
-          segment.bridges.forEach((bridge, bridgeIndex) => {
-              const n = bridge.points.length;
-              for (let i = 0; i < n; i++) {
-                  const polygonPoints = bridge.points[i].map((p) => `${p.x},${mapY(p.y)}`).join(' ');
-                  const fillColor =
-                      i === 0 || i === n - 1
-                          ? "brown" // Top and bottom sections are brown
-                          : SECTION_COLORS[(i - 1) % SECTION_COLORS.length]; // Alternate green colors for middle sections
-                  bridges.push(
-                      <Svg
-                          key={`bridge-${segmentIndex}-${bridgeIndex}-${i}`}
-                          style={{
-                              position: 'absolute',
-                              left: 0,
-                              top: 0,
-                              width: '100%',
-                              height: segment.length,
-                              zIndex: 100,
-                          }}
-                      >
-                          <Polygon
-                              points={polygonPoints}
-                              fill={fillColor}
-                          />
-                      </Svg>
-                  );
-              }
+    const SECTION_COLORS = ["navy", "darkgreen"];
+    return (
+      <Svg key={`bridges`} style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: movementViewDimensions.y - scrollingViewDimensions.y, }}>
+        {segmentsInRange().reduce((bridges, segment, segmentIndex) => {
+          segment.bridges.filter(_ => !_.destroyed).forEach((bridge, bridgeIndex) => {
+            const n = bridge.points.length;
+            for (let i = 0; i < n; i++) {
+              const polygonPoints = bridge.points[i].map((p) => `${p.x},${mapY(p.y + segment.offset)}`).join(' ');
+              const fillColor =
+                i === 0 || i === n - 1
+                  ? "brown" // Top and bottom sections are brown
+                  : SECTION_COLORS[(i - 1) % SECTION_COLORS.length]; // Alternate green colors for middle sections
+              bridges.push(
+                <Polygon
+                  key={`bridge-${segmentIndex}-${bridgeIndex}-${i}`}
+                  points={polygonPoints}
+                  fill={fillColor}
+                />);
+            }
           });
-      });
-      return bridges;
+          return bridges;
+        }, [])}
+      </Svg>);
   };
 
   const renderHelicopters = () =>
     segmentsInRange().
       map((segment, index) =>
-          segment.helicopters.map((helicopter, index2) => {
-            return (
-              <Image
-                key={`Helicopter-${index}-${index2}`}
-                source={helicopter.direction === 'ltr' ? helicopterLtrImage : helicopterRtlImage}
-                style={{
-                  position: 'absolute',
-                  width: HELICOPTER_SIZE.width,
-                  height: HELICOPTER_SIZE.height,
-                  left: helicopter.x,
-                  top: mapY(helicopter.y + segment.offset),
-                  zIndex: 0,
-                }}
-              />
-            );
-          })
+        segment.helicopters.filter(_ => !_.destroyed).map((helicopter, index2) => {
+          return (
+            <Image
+              key={`Helicopter-${index}-${index2}`}
+              source={helicopter.direction === 'ltr' ? helicopterLtrImage : helicopterRtlImage}
+              style={{
+                position: 'absolute',
+                width: HELICOPTER_SIZE.width,
+                height: HELICOPTER_SIZE.height,
+                left: helicopter.x,
+                top: mapY(helicopter.y + segment.offset),
+              }}
+            />
+          );
+        })
       );
 
   return (
