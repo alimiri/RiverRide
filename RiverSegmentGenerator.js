@@ -87,8 +87,8 @@ export default function generateRiverSegments(
         const bridges = [];
         if(true) {
             const bridge = {points: []};
-            const y1 = 450;//length / 2 - 50;
-            const y2 = 550;//length / 2 + 50;
+            const y1 = length / 2 - 50;
+            const y2 = length / 2 + 50;
             const yIncrement = (y2 - y1) / 10;
 
             for(let j = 0; j < 10; j++) {
@@ -117,7 +117,7 @@ export default function generateRiverSegments(
         //generate helicopters
         const helicopters = [];
         if(true) {
-            let y = 500;//length / 4;
+            let y = length / 4;
             let helicopter = {x: (screenWidth - (startWidth + (endWidth - startWidth) * y / length)) / 2, y: y, direction: 'ltr'};
             helicopters.push(helicopter);
             y = length * 3 / 4;

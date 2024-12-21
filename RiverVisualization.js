@@ -107,7 +107,7 @@ function RiverVisualization({ width, riverSegments, treeImage }) {
                 );
             })}
             {renderTrees()}
-            {renderRuler()}
+            {/*renderRuler()*/}
         </View>
     );
 }

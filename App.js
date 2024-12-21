@@ -16,10 +16,10 @@ import helicopterRtlImage from './assets/helicopter-rtl.png';
 
 const AIRPLANE_SIZE = { width: 50, height: 50 };
 const HELICOPTER_SIZE = { width: 50, height: 50 };
-const SPEED_INIT = 100;
-const SPEED_MAX = 1500;
-const SPEED_MIN = 50;
-const SPEED_INCREASE_STEP = 1;
+const SPEED_INIT = 50;
+const SPEED_MAX = 100;
+const SPEED_MIN = 20;
+const SPEED_INCREASE_STEP = 5;
 const SPEED_BACK_TIMING = 100;
 
 const FUEL_INIT = 100;
@@ -40,7 +40,7 @@ export default function App() {
   const world = useRef(null);
   const [scrollingViewDimensions, setScrollingViewDimensions] = useState({ x: 0, y: 0, width: 0, height: 0 });
   const [movementViewDimensions, setMovementViewDimensions] = useState({ x: 0, y: 0, width: 0, height: 0 });
-  const [isGameRunning, setIsGameRunning] = useState(false);
+  const isGameRunning = useRef(false);
   const leftBorder = useRef(0);
   const rightBorder = useRef(0);
   const endGameHandleRef = useRef(false);
@@ -75,7 +75,7 @@ export default function App() {
   const moveAirplane = (direction) => {
     const prev = playerPosition.current;
 
-    if (!isGameRunning) {
+    if (!isGameRunning.current) {
       return;
     }
     let newX = prev.x;
@@ -136,9 +136,9 @@ export default function App() {
   };
 
   const handleShoot = () => {
-    if (!isGameRunning) {
+    if (!isGameRunning.current) {
       restartGame();
-      setIsGameRunning(true);
+      isGameRunning.current = true;
       startSound('airplane');
       return;
     }
@@ -208,7 +208,7 @@ export default function App() {
     let _segment;
     segmentsInRange().forEach(segment => {
       _segment = segment;
-      if (airplaneYRelative < segment.offset + segment.length) {
+      if (airplaneYRelative >= segment.offset && airplaneYRelative <= segment.offset + segment.length) {
         const y = airplaneYRelative - segment.offset;
 
         // Calculate the width and borders of the river at the current y
@@ -222,10 +222,10 @@ export default function App() {
         //playerPosition.current = {x: rightBorder.current - AIRPLANE_SIZE.width / 2, y: initialPosition.y};
       }
     });
-    if (!isGameRunning || playerPosition.current.x === 0) return;
+    if (!isGameRunning.current || playerPosition.current.x === 0) return;
     // check for border collision
-    checkForCollision(playerPosition.current.x);
-
+    if(checkForCollision(playerPosition.current.x)){
+console.log('1');}
     //check bridge collision
     const bridge = _segment.bridges.find(bridge => {
       if (!bridge.destroyed && airplaneYRelative >= bridge.points[0][0].y + _segment.offset) {
@@ -245,8 +245,8 @@ export default function App() {
       if (!helicopter.destroyed
         && airplaneYRelative >= helicopter.y + _segment.offset
         && airplaneYRelative <= helicopter.y + _segment.offset + HELICOPTER_SIZE.height
-        //&& playerPosition.x >= helicopter.x - HELICOPTER_SIZE.width / 2
-        //&& playerPosition.x <= helicopter.x + HELICOPTER_SIZE.width / 2
+        && ((playerPosition.x - AIRPLANE_SIZE.width / 2 >= helicopter.x - HELICOPTER_SIZE.width / 2 && playerPosition.x - AIRPLANE_SIZE.width / 2 <= helicopter.x + HELICOPTER_SIZE.width / 2) ||
+            (playerPosition.x + AIRPLANE_SIZE.width / 2 >= helicopter.x - HELICOPTER_SIZE.width / 2 && playerPosition.x + AIRPLANE_SIZE.width / 2 <= helicopter.x + HELICOPTER_SIZE.width / 2))
       ){
         stopSound();
         startSound('explosion');
@@ -270,7 +270,7 @@ export default function App() {
   };
 
   const checkForCollision = (xPosition) => {
-    if (!isGameRunning || endGameHandleRef.current) return true;
+    if (!isGameRunning.current || endGameHandleRef.current) return true;
 
     if (xPosition < leftBorder.current + AIRPLANE_SIZE.width / 2 || xPosition > rightBorder.current - AIRPLANE_SIZE.width / 2) {
       handleEndGame('border');
@@ -290,7 +290,7 @@ export default function App() {
     if (endGameHandleRef.current) return; // Ensure only one collision is handled
     endGameHandleRef.current = true; // Set flag to prevent duplicate alerts
 
-    setIsGameRunning(false); // Stop the game
+    isGameRunning.current = false; // Stop the game
 
     const message = barrier === 'fuel' ? "You ran out of fuel!" : `You hit the ${barrier}!`;
     Alert.alert(
@@ -321,7 +321,7 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (!isGameRunning) return;
+    if (!isGameRunning.current) return;
 
     const interval = setInterval(() => {
       setFuel((prevFuel) => {
@@ -334,7 +334,7 @@ export default function App() {
     }, 1000);
 
     return () => clearInterval(interval); // Cleanup interval on component unmount
-  }, [isGameRunning]);
+  }, [isGameRunning.current]);
 
 
   useEffect(() => {
@@ -348,7 +348,7 @@ export default function App() {
   // Handle bullet movement
   const bulletMovementIntervalRef = useRef(null);
   useEffect(() => {
-    if (isGameRunning) {
+    if (isGameRunning.current) {
       bulletMovementIntervalRef.current = setInterval(() => {
         if (entitiesRef.current) {
           setBullets((prevBullets) => {
@@ -430,7 +430,7 @@ export default function App() {
         bulletMovementIntervalRef.current = null;
       }
     }
-  }, [isGameRunning]);
+  }, [isGameRunning.current]);
 
   const initSegment = () => {
     const segments = riverSegmentGenerator(screenWidth, RIVER_MIN_WIDTH_RATIO, RIVER_MAX_WIDTH_RATIO, screenHeight / 2, screenHeight * 5, 100, 50, { seedW: 1, seedH: 2, seedTree: 3, seedBridge: 1, seedHelicopter: 10 }, HELICOPTER_SIZE.width);
@@ -515,7 +515,7 @@ export default function App() {
             height={screenHeight}
             riverSegments={riverSegments}
             speed={speed.current}
-            isGameRunning={isGameRunning}
+            isGameRunning={isGameRunning.current}
             onScrollPositionChange={onScrollPositionChange}
             onDimensionsChange={handleScrollingBackgroundDimensionsChange}
             resetFlag={resetFlag}
@@ -558,14 +558,14 @@ export default function App() {
         </View>
 
         <View style={memoizedStyles.controlsStrip}>
-          <ShootButton onShoot={handleShoot} isGameRunning={isGameRunning} />
+          <ShootButton onShoot={handleShoot} isGameRunning={isGameRunning.current} />
 
           {/* Right: Movement Area */}
           <MovementArea
             onMoveAcc={(dir) => moveAirplane(dir)}
             onChangeAcc={(dir) => startAcc(dir)}
             onDimensionsChange={handleMovementAreaDimensionsChange}
-            isGameRunning={isGameRunning}
+            isGameRunning={isGameRunning.current}
           />
         </View>
       </View>
