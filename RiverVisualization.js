@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Image, Text } from 'react-native';
 import Svg, { Polygon } from 'react-native-svg';
 
-const RiverSegment = ({ startWidth, endWidth, length, screenWidth, bridges }) => {
+const RiverSegment = ({ startWidth, endWidth, length, screenWidth }) => {
     const startX = (screenWidth - startWidth) / 2;
     const endX = (screenWidth - endWidth) / 2;
 
@@ -22,32 +22,7 @@ const RiverSegment = ({ startWidth, endWidth, length, screenWidth, bridges }) =>
     );
 };
 
-function RiverVisualization({ width, riverSegments, treeImage }) {
-    const renderTrees = () => {
-        let trees = [];
-        riverSegments.river.forEach((segment, segmentIndex) => {
-            segment.objects.filter(_ => _.type === 'tree').forEach((tree, treeIndex) => {
-                const treeY = tree.y + segment.offset;
-                trees.push(
-                    <Image
-                        key={`tree-${segmentIndex}-${treeIndex}`}
-                        source={treeImage} // Pass image as prop
-                        style={{
-                            position: 'absolute',
-                            left: tree.x,
-                            top: treeY,
-                            width: 50,
-                            height: 50,
-                            transform: [{ rotate: '180deg' }], // Apply 180 degree rotation
-                        }}
-                    />
-                );
-            });
-        });
-
-        return trees;
-    };
-
+function RiverVisualization({ width, riverSegments }) {
     const renderRuler = () => {
         let nodes = [];
         for (let index = 0; index < 100; index++) {
@@ -91,7 +66,6 @@ function RiverVisualization({ width, riverSegments, treeImage }) {
         return nodes;
     };
 
-
     return (
         <View style={{ width, height: riverSegments.totalHeight, flexDirection: 'column', alignItems: 'center' }}>
             {riverSegments.river.map((segment, index) => {
@@ -102,11 +76,9 @@ function RiverVisualization({ width, riverSegments, treeImage }) {
                         endWidth={segment.endWidth}
                         length={segment.length}
                         screenWidth={width}
-                        bridges={segment.bridges}
                     />
                 );
             })}
-            {renderTrees()}
             {/*renderRuler()*/}
         </View>
     );

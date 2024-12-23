@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View } from 'react-native';
 import RiverVisualization from './RiverVisualization';
-import treeImage from './assets/tree.png';
 
 const ScrollingBackground = ({
     width,
@@ -51,7 +50,6 @@ const ScrollingBackground = ({
                 <RiverVisualization
                     width={width}
                     riverSegments={riverSegments}
-                    treeImage={treeImage}
                 />
             </View>
         ),

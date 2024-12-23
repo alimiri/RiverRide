@@ -12,7 +12,7 @@ import Svg, { Polygon } from 'react-native-svg';
 import airplaneImage from './assets/airplane.png';
 import helicopterLtrImage from './assets/helicopter-ltr.png';
 import helicopterRtlImage from './assets/helicopter-rtl.png';
-
+import treeImage from './assets/tree.png';
 
 const AIRPLANE_SIZE = { width: 50, height: 50 };
 const SPEED_INIT = 50;
@@ -25,8 +25,6 @@ const FUEL_INIT = 100;
 
 const BULLET_SPEED = 5;
 const BULLET_SIZE = { width: 2, height: 3 };
-
-let initialPosition = { x: 0, y: 0 };
 
 export default function App() {
   const [score, setScore] = useState(0);
@@ -49,7 +47,8 @@ export default function App() {
   const isAirplaneVisible = useRef(true);
 
   const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
-  const playerPosition = useRef(initialPosition);
+  const initialPosition = useRef({ x: 0, y: 0 });
+  const playerPosition = useRef(initialPosition.current);
   const [airplaneYRelative, setAirplaneYRelative] = useState(0);
   const bottomOfTheRiverRef = useRef(0);
   const memoizedStyles = useMemo(() => styles(screenWidth, screenHeight), [screenWidth, screenHeight]);
@@ -59,16 +58,37 @@ export default function App() {
 
   const entitiesRef = useRef(null);  // Ref to store entities
 
+  const objects = {
+    tree: {
+      seed: 3,
+      size: { width: 50, height: 50 },
+      movement: 'still',
+      image: {still: treeImage},
+      minNumber: 5,
+      maxNumber: 10,
+    },
+    helicopter: {
+      seed: 10,
+      size: { width: 50, height: 50 },
+      movement: 'shuttle',
+      image: {ltr: helicopterLtrImage, rtl: helicopterRtlImage},
+      minNumber: 1,
+      maxNumber: 4,
+    }
+  };
+
   const handleScrollingBackgroundDimensionsChange = (layout) => {
     setScrollingViewDimensions(layout);
-    initialPosition = { x: screenWidth / 2, y: movementViewDimensions.y - layout.y - 50 - AIRPLANE_SIZE.height / 2 };
-    playerPosition.current = initialPosition;
+    initialPosition.current = { x: screenWidth / 2, y: movementViewDimensions.y - layout.y - 50 - AIRPLANE_SIZE.height / 2 };
+    playerPosition.current = initialPosition.current;
+    console.log(`playerPosition.currentA: ${playerPosition.current.x}, ${playerPosition.current.y}, initialPosition.current: ${initialPosition.current.x}, ${initialPosition.current.y}`);
   };
 
   const handleMovementAreaDimensionsChange = (layout) => {
     setMovementViewDimensions(layout);
-    initialPosition = { x: screenWidth / 2, y: layout.y - scrollingViewDimensions.y - 50 - AIRPLANE_SIZE.height / 2 };
-    playerPosition.current = initialPosition;
+    initialPosition.current = { x: screenWidth / 2, y: layout.y - scrollingViewDimensions.y - 50 - AIRPLANE_SIZE.height / 2 };
+    playerPosition.current = initialPosition.current;
+    console.log(`playerPosition.currentB: ${playerPosition.current.x}, ${playerPosition.current.y}, initialPosition.current: ${initialPosition.current.x}, ${initialPosition.current.y}`);
   };
 
   const moveAirplane = (direction) => {
@@ -216,17 +236,17 @@ export default function App() {
         rightBorder.current = leftBorder.current + widthAtY;
 
         //stick to the left border
-        //playerPosition.current = {x: leftBorder.current + AIRPLANE_SIZE.width / 2, y: initialPosition.y};
+        //playerPosition.current = {x: leftBorder.current + AIRPLANE_SIZE.width / 2, y: initialPosition.current.y};
         //stick to the right border
-        //playerPosition.current = {x: rightBorder.current - AIRPLANE_SIZE.width / 2, y: initialPosition.y};
+        //playerPosition.current = {x: rightBorder.current - AIRPLANE_SIZE.width / 2, y: initialPosition.current.y};
       }
     });
     if (!isGameRunning.current || playerPosition.current.x === 0) return;
     // check for border collision
     checkForCollision(playerPosition.current.x);
     //check bridge collision
-    const bridge = _segment.bridges.find(bridge => {
-      if (!bridge.destroyed && airplaneYRelative >= bridge.points[0][0].y + _segment.offset) {
+    const bridge = _segment.objects.find(bridge => {
+      if (bridge.type === 'bridge' && !bridge.destroyed && airplaneYRelative >= bridge.points[0][0].y + _segment.offset) {
         stopSound();
         startSound('explosion');
         addExplosion(playerPosition.current.x, playerPosition.current.y, bottomOfTheRiverRef.current);
@@ -274,7 +294,7 @@ export default function App() {
     explosions.current.push({ x, y, refPosition });
     setTimeout(() => {
       explosions.current.splice(0, 1);
-    }, 3000);
+    }, 1000);
   };
 
   const checkForCollision = (xPosition) => {
@@ -315,7 +335,8 @@ export default function App() {
 
   const restartGame = () => {
     endGameHandleRef.current = false; // Reset collision handling flag
-    playerPosition.current = initialPosition; // Reset the player position
+    playerPosition.current = initialPosition.current; // Reset the player position
+    console.log(`playerPosition.current: ${playerPosition.current.x}, ${playerPosition.current.y}, initialPosition.current: ${initialPosition.current.x}, ${initialPosition.current.y}`);
     setFuel(FUEL_INIT); // Reset fuel
     speed.current = SPEED_INIT; // Reset speed
     setResetFlag((prev) => !prev);
@@ -369,8 +390,8 @@ export default function App() {
                 let found = false;
                 segmentsInRange().forEach(segment => {
                 //check for bullet to the bridge collision
-                  const bridgeIndex = segment.bridges.findIndex(bridge => {
-                    if (!bridge.destroyed && bulletYRelative >= bridge.points[0][0].y + segment.offset) {
+                  const bridge = segment.objects.find(bridge => {
+                    if (bridge.type === 'bridge' && !bridge.destroyed && bulletYRelative >= bridge.points[0][0].y + segment.offset) {
                       //stopSound();
                       startSound('explosion');
                       addExplosion(bridge.points[5][0].x + (bridge.points[5][1].x - bridge.points[5][0].x) / 4, bridge.points[5][0].y + segment.offset - bottomOfTheRiverRef.current, bottomOfTheRiverRef.current);
@@ -378,8 +399,8 @@ export default function App() {
                       return true;
                     }
                   });
-                  if (bridgeIndex >= 0) {
-                    segment.bridges[bridgeIndex].destroyed = true;
+                  if (bridge) {
+                    bridge.destroyed = true;
                     found = true;
                   }
 
@@ -437,21 +458,8 @@ export default function App() {
     }
   }, [isGameRunning.current]);
 
-  const objects = {
-    tree: {
-      seed: 3,
-      size: { width: 50, height: 50 },
-      movement: 'fixed',
-    },
-    helicopter: {
-      seed: 10,
-      size: { width: 50, height: 50 },
-      movement: 'shuttle',
-    }
-  };
-
   const initSegments = () => {
-    const segments = riverSegmentGenerator(screenWidth, RIVER_MIN_WIDTH_RATIO, RIVER_MAX_WIDTH_RATIO, screenHeight / 2, screenHeight * 5, 100, 50, { seedW: 1, seedH: 2, seedBridge: 1 }, objects);
+    const segments = riverSegmentGenerator(screenWidth, RIVER_MIN_WIDTH_RATIO, RIVER_MAX_WIDTH_RATIO, screenHeight / 2, screenHeight * 5, 100, { seedW: 1, seedH: 2, seedBridge: 1 }, objects);
     setRiverSegments(segments);
   };
 
@@ -474,7 +482,7 @@ export default function App() {
     return (
       <Svg key={`bridges`} style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: movementViewDimensions.y - scrollingViewDimensions.y, }}>
         {segmentsInRange().reduce((bridges, segment, segmentIndex) => {
-          segment.bridges.filter(_ => !_.destroyed).forEach((bridge, bridgeIndex) => {
+          segment.objects.filter(_ => ['bridge'].includes(_.type)  && !_.destroyed).forEach((bridge, bridgeIndex) => {
             const n = bridge.points.length;
             for (let i = 0; i < n; i++) {
               const polygonPoints = bridge.points[i].map((p) => `${p.x},${mapY(p.y + segment.offset)}`).join(' ');
@@ -494,25 +502,24 @@ export default function App() {
         }, [])}
       </Svg>);
   };
-
-  const renderHelicopters = () =>
+  const renderObjects = () =>
     segmentsInRange().
-      map((segment, index) =>
-        segment.objects.filter(_ => _.type === 'helicopter' && !_.destroyed).map((helicopter, index2) => {
+      map((segment, segmentIndex) => {
+        return segment.objects.filter(_ => ['helicopter', 'tree'].includes(_.type)  && !_.destroyed).map((object, objectIndex) => {
           return (
             <Image
-              key={`Helicopter-${index}-${index2}`}
-              source={helicopter.direction === 'ltr' ? helicopterLtrImage : helicopterRtlImage}
+              key={`${object.type}-${segmentIndex}-${objectIndex}`}
+              source={objects[object.type].image[object.direction??objects[object.type].movement]}
               style={{
                 position: 'absolute',
-                width: objects['helicopter'].size.width,
-                height: objects['helicopter'].size.height,
-                left: helicopter.x,
-                top: mapY(helicopter.y + segment.offset),
+                width: objects[object.type].size.width,
+                height: objects[object.type].size.height,
+                left: object.x,
+                top: mapY(object.y + segment.offset),
               }}
             />
           );
-        })
+        })}
       );
 
   return (
@@ -568,8 +575,8 @@ export default function App() {
             />
             );
           })}
-          {/* helicopters */}
-          {renderHelicopters()}
+          {/* trees and helicopters */}
+          {renderObjects()}
           {/* explosions */}
           {explosions.current.map((explosion, index) => (
             <Explosion key={index} x={explosion.x} y={explosion.y - explosion.refPosition + bottomOfTheRiverRef.current} />

@@ -17,7 +17,6 @@ export default function generateRiverSegments(
     minLength,
     maxLength,
     numSegments,
-    treeWidth,
     seeds,
     objects,
 ) {
@@ -55,10 +54,10 @@ export default function generateRiverSegments(
             }
         }
 
+        const _objects = [];
         //generate briges
-        const bridges = [];
         if(true) {
-            const bridge = {points: []};
+            const bridge = {type: 'bridge', points: []};
             const y1 = length / 2 - 50;
             const y2 = length / 2 + 50;
             const yIncrement = (y2 - y1) / 10;
@@ -71,58 +70,43 @@ export default function generateRiverSegments(
                 aPoints.push({y: y1  + (j + 1) * yIncrement, x: screenWidth - aPoints[2].x});
                 bridge.points.push(aPoints);
             }
-            bridge.y1 = length / 2 - 100;
-            bridge.y2 = bridge.y1;
-            let interpolatedWidth = (screenWidth - startWidth - ((endWidth - startWidth) * bridge.y1) / length) / 2;
-            bridge.x1 = (screenWidth - interpolatedWidth) / 2;
-            bridge.x2 = bridge.x1 + interpolatedWidth;
 
-            bridge.y3 = length / 2 + 100;
-            bridge.y4 = bridge.y3;
-            interpolatedWidth = startWidth + ((endWidth - startWidth) * bridge.y3) / length;
-            bridge.x3 = (screenWidth - interpolatedWidth) / 2;
-            bridge.x4 = bridge.x3 + interpolatedWidth;
-
-            bridges.push(bridge);
+            _objects.push(bridge);
         }
 
-        const _objects = [];
-        //generate trees
-        const randomTree = new SeededRandom(objects['tree'].seed);
-        const nTrees = Math.round(randomTree.next() * 10);
-        for (let j = 0; j < nTrees; j++) {
-            const y = Math.floor(randomTree.next() * length);
+        //generate trees and helicopters
+        Object.keys(objects).filter(objectType => ['tree', 'helicopter'].includes(objectType)).forEach(objectType => {
+            console.log(objectType);
+            const randomTree = new SeededRandom(objects[objectType].seed);
+            const nObjects = objects[objectType].minNumber + Math.round(randomTree.next() * (objects[objectType].maxNumber - objects[objectType].minNumber));
+            for (let j = 0; j < nObjects; j++) {
+                let y;
+                do {
+                    y = Math.floor(randomTree.next() * length);
+                } while (i === 0 && y < 200);
+                const interpolatedWidth = startWidth + ((endWidth - startWidth) * y) / length;
 
-            // Calculate the river's width at this y (interpolated between startWidth and endWidth)
-            const interpolatedWidth = startWidth + ((endWidth - startWidth) * y) / length;
+                const leftBorder = (screenWidth - interpolatedWidth) / 2;
+                const rightBorder = leftBorder + interpolatedWidth;
 
-            // Calculate the river's left and right borders at this y
-            const leftBorder = (screenWidth - interpolatedWidth) / 2;
-            const rightBorder = leftBorder + interpolatedWidth;
-
-            // Adjust for treeWidth to prevent overlap with the river
-            let x;
-            if (randomTree.next() < 0.5) {
-                // Place the tree to the left of the river
-                x = Math.floor(randomTree.next() * (leftBorder - treeWidth));
-            } else {
-                // Place the tree to the right of the river
-                x = Math.floor(randomTree.next() * (screenWidth - rightBorder - treeWidth)) + rightBorder + treeWidth;
+                let x;
+                let direction = objects[objectType].movement === 'shuttle' ? (randomTree.next() > 0.5 ? 'ltr' : 'rtl') : undefined;
+                if(objects[objectType].movement === 'still') {
+                    if (randomTree.next() < 0.5) {
+                        x = Math.floor(randomTree.next() * (leftBorder - objects[objectType].size.width));
+                    } else {
+                        x = Math.floor(randomTree.next() * (screenWidth - rightBorder - objects[objectType].size.width)) + rightBorder + objects[objectType].size.width;
+                    }
+                } else if(objects[objectType].movement === 'shuttle') {
+                    if(direction === 'ltr') {
+                        x = (screenWidth - (startWidth + (endWidth - startWidth) * y / length)) / 2;
+                    } else {
+                        x = screenWidth - (screenWidth - (startWidth + (endWidth - startWidth) * y / length)) / 2 - objects[objectType].size.width;
+                    }
+                }
+                _objects.push({type: objectType, x, y, direction });
             }
-
-            // Add the tree position
-            _objects.push({type: 'tree', x, y });
-        }
-
-        //generate helicopters
-        if(true) {
-            let y = length / 4;
-            let helicopter = {type: 'helicopter', x: (screenWidth - (startWidth + (endWidth - startWidth) * y / length)) / 2, y: y, direction: 'ltr'};
-            _objects.push(helicopter);
-            y = length * 3 / 4;
-            helicopter = {type: 'helicopter', x: screenWidth - (screenWidth - (startWidth + (endWidth - startWidth) * y / length)) / 2 - objects['helicopter'].size.width, y: y, direction: 'rtl'};
-            _objects.push(helicopter);
-        }
+        });
 
         // Push the segment (startWidth, endWidth, length, objects)
         segments.push({
@@ -130,7 +114,6 @@ export default function generateRiverSegments(
             startWidth: startWidth,
             endWidth: endWidth,
             length: length,
-            bridges: bridges,
             objects: _objects,
         });
         offset += length;
