@@ -76,7 +76,6 @@ export default function generateRiverSegments(
 
         //generate trees and helicopters
         Object.keys(objects).filter(objectType => ['tree', 'helicopter'].includes(objectType)).forEach(objectType => {
-            console.log(objectType);
             const randomTree = new SeededRandom(objects[objectType].seed);
             const nObjects = objects[objectType].minNumber + Math.round(randomTree.next() * (objects[objectType].maxNumber - objects[objectType].minNumber));
             for (let j = 0; j < nObjects; j++) {

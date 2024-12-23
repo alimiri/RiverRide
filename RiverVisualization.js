@@ -79,7 +79,7 @@ function RiverVisualization({ width, riverSegments }) {
                     />
                 );
             })}
-            {/*renderRuler()*/}
+            {/* renderRuler() */}
         </View>
     );
 }
