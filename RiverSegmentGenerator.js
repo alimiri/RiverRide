@@ -19,12 +19,12 @@ export default function generateRiverSegments(
     numSegments,
     treeWidth,
     seeds,
-    helicopterWidth,
+    objects,
 ) {
-    const {seedW, seedH, seedTree, seedBridge, seedHelicopter} = seeds;
+    const {seedW, seedH, seedBridge, seedHelicopter} = seeds;
     const randomW = new SeededRandom(seedW); // Seeded RNG for width
     const randomH = new SeededRandom(seedH); // Seeded RNG for length
-    const randomTree = new SeededRandom(seedTree); // Seeded RNG for trees
+
 
     let segments = [];
     let startWidth = maxWidth;
@@ -32,9 +32,6 @@ export default function generateRiverSegments(
     let offset = 0;
 
     for (let i = 0; i < numSegments; i++) {
-        const trees = [];
-        const nTrees = 1;//Math.round(randomTree.next() * 10); // Random number of trees
-
         // Determine segment length
         let length = minLength + Math.floor((maxLength - minLength) * randomH.next());
 
@@ -56,31 +53,6 @@ export default function generateRiverSegments(
                 endWidth = Math.floor(randomW.next() * (maxWidth - minWidth + 1)) + minWidth;
                 length = minLength;
             }
-        }
-
-        // Generate random trees for the segment
-        for (let j = 0; j < nTrees; j++) {
-            const y = Math.floor(randomTree.next() * length); // Random y within segment length
-
-            // Calculate the river's width at this y (interpolated between startWidth and endWidth)
-            const interpolatedWidth = startWidth + ((endWidth - startWidth) * y) / length;
-
-            // Calculate the river's left and right borders at this y
-            const leftBorder = (screenWidth - interpolatedWidth) / 2;
-            const rightBorder = leftBorder + interpolatedWidth;
-
-            // Adjust for treeWidth to prevent overlap with the river
-            let x;
-            if (randomTree.next() < 0.5) {
-                // Place the tree to the left of the river
-                x = Math.floor(randomTree.next() * (leftBorder - treeWidth));
-            } else {
-                // Place the tree to the right of the river
-                x = Math.floor(randomTree.next() * (screenWidth - rightBorder - treeWidth)) + rightBorder + treeWidth;
-            }
-
-            // Add the tree position
-            trees.push({ x, y });
         }
 
         //generate briges
@@ -114,26 +86,52 @@ export default function generateRiverSegments(
             bridges.push(bridge);
         }
 
-        //generate helicopters
-        const helicopters = [];
-        if(true) {
-            let y = length / 4;
-            let helicopter = {x: (screenWidth - (startWidth + (endWidth - startWidth) * y / length)) / 2, y: y, direction: 'ltr'};
-            helicopters.push(helicopter);
-            y = length * 3 / 4;
-            helicopter = {x: screenWidth - (screenWidth - (startWidth + (endWidth - startWidth) * y / length)) / 2 - helicopterWidth, y: y, direction: 'rtl'};
-            helicopters.push(helicopter);
+        const _objects = [];
+        //generate trees
+        const randomTree = new SeededRandom(objects['tree'].seed);
+        const nTrees = Math.round(randomTree.next() * 10);
+        for (let j = 0; j < nTrees; j++) {
+            const y = Math.floor(randomTree.next() * length);
+
+            // Calculate the river's width at this y (interpolated between startWidth and endWidth)
+            const interpolatedWidth = startWidth + ((endWidth - startWidth) * y) / length;
+
+            // Calculate the river's left and right borders at this y
+            const leftBorder = (screenWidth - interpolatedWidth) / 2;
+            const rightBorder = leftBorder + interpolatedWidth;
+
+            // Adjust for treeWidth to prevent overlap with the river
+            let x;
+            if (randomTree.next() < 0.5) {
+                // Place the tree to the left of the river
+                x = Math.floor(randomTree.next() * (leftBorder - treeWidth));
+            } else {
+                // Place the tree to the right of the river
+                x = Math.floor(randomTree.next() * (screenWidth - rightBorder - treeWidth)) + rightBorder + treeWidth;
+            }
+
+            // Add the tree position
+            _objects.push({type: 'tree', x, y });
         }
 
-        // Push the segment (startWidth, endWidth, length, trees)
+        //generate helicopters
+        if(true) {
+            let y = length / 4;
+            let helicopter = {type: 'helicopter', x: (screenWidth - (startWidth + (endWidth - startWidth) * y / length)) / 2, y: y, direction: 'ltr'};
+            _objects.push(helicopter);
+            y = length * 3 / 4;
+            helicopter = {type: 'helicopter', x: screenWidth - (screenWidth - (startWidth + (endWidth - startWidth) * y / length)) / 2 - objects['helicopter'].size.width, y: y, direction: 'rtl'};
+            _objects.push(helicopter);
+        }
+
+        // Push the segment (startWidth, endWidth, length, objects)
         segments.push({
             offset: offset,
             startWidth: startWidth,
             endWidth: endWidth,
             length: length,
-            trees: trees,
             bridges: bridges,
-            helicopters: helicopters,
+            objects: _objects,
         });
         offset += length;
     }

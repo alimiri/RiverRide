@@ -26,7 +26,7 @@ function RiverVisualization({ width, riverSegments, treeImage }) {
     const renderTrees = () => {
         let trees = [];
         riverSegments.river.forEach((segment, segmentIndex) => {
-            segment.trees.forEach((tree, treeIndex) => {
+            segment.objects.filter(_ => _.type === 'tree').forEach((tree, treeIndex) => {
                 const treeY = tree.y + segment.offset;
                 trees.push(
                     <Image

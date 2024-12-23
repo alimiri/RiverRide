@@ -15,7 +15,6 @@ import helicopterRtlImage from './assets/helicopter-rtl.png';
 
 
 const AIRPLANE_SIZE = { width: 50, height: 50 };
-const HELICOPTER_SIZE = { width: 50, height: 50 };
 const SPEED_INIT = 50;
 const SPEED_MAX = 100;
 const SPEED_MIN = 20;
@@ -93,7 +92,7 @@ export default function App() {
   const Explosion = ({ x, y }) => {
     return (
       <LottieView
-        source={require('./assets/explosion.json')}
+        source={require('./assets/explosion2.json')}
         autoPlay
         loop={false}
         style={{
@@ -203,7 +202,7 @@ export default function App() {
 
   onScrollPositionChange = (scrollPosition) => {
     bottomOfTheRiverRef.current = scrollingViewDimensions.height ? riverSegments.totalHeight - scrollingViewDimensions.height - scrollPosition : 0;
-    const airplaneYRelative = bottomOfTheRiverRef.current + 50 + AIRPLANE_SIZE.height;
+    const airplaneYRelative = bottomOfTheRiverRef.current + 50 + AIRPLANE_SIZE.height / 2;
     setAirplaneYRelative(airplaneYRelative);
     let _segment;
     segmentsInRange().forEach(segment => {
@@ -224,8 +223,7 @@ export default function App() {
     });
     if (!isGameRunning.current || playerPosition.current.x === 0) return;
     // check for border collision
-    if(checkForCollision(playerPosition.current.x)){
-console.log('1');}
+    checkForCollision(playerPosition.current.x);
     //check bridge collision
     const bridge = _segment.bridges.find(bridge => {
       if (!bridge.destroyed && airplaneYRelative >= bridge.points[0][0].y + _segment.offset) {
@@ -241,19 +239,29 @@ console.log('1');}
       return true;
     }
     //check helicopter collision
-    const helicopter = _segment.helicopters.find(helicopter => {
-      if (!helicopter.destroyed
-        && airplaneYRelative >= helicopter.y + _segment.offset
-        && airplaneYRelative <= helicopter.y + _segment.offset + HELICOPTER_SIZE.height
-        && ((playerPosition.x - AIRPLANE_SIZE.width / 2 >= helicopter.x - HELICOPTER_SIZE.width / 2 && playerPosition.x - AIRPLANE_SIZE.width / 2 <= helicopter.x + HELICOPTER_SIZE.width / 2) ||
-            (playerPosition.x + AIRPLANE_SIZE.width / 2 >= helicopter.x - HELICOPTER_SIZE.width / 2 && playerPosition.x + AIRPLANE_SIZE.width / 2 <= helicopter.x + HELICOPTER_SIZE.width / 2))
-      ){
+    const helicopter = _segment.objects.filter(_ => _.type === 'helicopter').find(helicopter => {
+      if (helicopter.destroyed) {
+        return false;
+      }
+      let yCollide = false;
+      let xCollide = false;
+      if(airplaneYRelative + AIRPLANE_SIZE.height / 2 >= helicopter.y + _segment.offset - objects['helicopter'].size.height / 2 && airplaneYRelative - AIRPLANE_SIZE.height / 2 <= helicopter.y + _segment.offset + objects['helicopter'].size.height / 2) {
+        yCollide = true;
+      }
+      if((playerPosition.current.x - AIRPLANE_SIZE.width / 2 >= helicopter.x - objects['helicopter'].size.width / 2 && playerPosition.current.x - AIRPLANE_SIZE.width / 2 <= helicopter.x + objects['helicopter'].size.width / 2) ||
+            (playerPosition.current.x + AIRPLANE_SIZE.width / 2 >= helicopter.x - objects['helicopter'].size.width / 2 && playerPosition.current.x + AIRPLANE_SIZE.width / 2 <= helicopter.x + objects['helicopter'].size.width / 2)) {
+        xCollide = true;
+      }
+      if(yCollide && xCollide){
         stopSound();
         startSound('explosion');
         addExplosion(playerPosition.current.x, playerPosition.current.y, bottomOfTheRiverRef.current);
-        addExplosion(helicopter.x, helicopter.y, bottomOfTheRiverRef.current);
+        addExplosion(helicopter.x, mapY(helicopter.y + _segment.offset), bottomOfTheRiverRef.current);
         isAirplaneVisible.current = false;
+        helicopter.destroyed = true;
         return true;
+      } else {
+        return false;
       }
     });
     if (helicopter) {
@@ -314,8 +322,7 @@ console.log('1');}
     isAirplaneVisible.current = true;
     //restore bridges and helicopters
     riverSegments.river.forEach(segment => {
-      segment.bridges.forEach(bridge => {bridge.destroyed = false;});
-      segment.helicopters.forEach(helicopter => {helicopter.destroyed = false;});
+      segment.objects.forEach(object => {object.destroyed = false;});
     });
     setBullets(() => []);
   };
@@ -377,24 +384,18 @@ console.log('1');}
                   }
 
                   //check for bullet to the helicopter collision
-                  const helicopterIndex = segment.helicopters.findIndex(helicopter => {
-                    if (!helicopter.destroyed &&
-                        bulletYRelative >= helicopter.y + segment.offset &&
-                        bulletYRelative <= helicopter.y + segment.offset + HELICOPTER_SIZE.height &&
-                        bullet.position.x >= helicopter.x - HELICOPTER_SIZE.width / 2 &&
-                        bullet.position.x <= helicopter.x + HELICOPTER_SIZE.width / 2) {
-                      //stopSound();
+                  const helicopter = segment.objects.find(helicopter =>
+                        helicopter.type === 'helicopter' && !helicopter.destroyed &&
+                        bulletYRelative >= helicopter.y - objects['helicopter'].size.height / 2 + segment.offset &&
+                        bulletYRelative <= helicopter.y + objects['helicopter'].size.height / 2 + segment.offset &&
+                        bullet.position.x >= helicopter.x - objects['helicopter'].size.width / 2 &&
+                        bullet.position.x <= helicopter.x + objects['helicopter'].size.width / 2);
+                  if (helicopter) {
                       startSound('explosion');
                       addExplosion(bullet.position.x, bullet.position.y, bottomOfTheRiverRef.current);
-                      return true;
-                    }
-                  });
-                  if (helicopterIndex >= 0) {
-                    segment.helicopters[helicopterIndex].destroyed = true;
-                    found = true;
+                      helicopter.destroyed = true;
+                      found = true;
                   }
-
-
                 });
 
                 return !found && bullet.position.y > 0
@@ -404,15 +405,19 @@ console.log('1');}
 
           // helicopter movement
           segmentsInRange().forEach(segment => {
-            segment.helicopters.forEach(helicopter => {
+            segment.objects.filter(_ => _.type === 'helicopter').forEach(helicopter => {
+              const widthAtY = segment.startWidth + (helicopter.y / segment.length) * (segment.endWidth - segment.startWidth);
+              const leftBorder = (screenWidth - widthAtY) / 2;
+              const rightBorder = leftBorder + widthAtY;
+
               if (helicopter.direction === 'ltr') {
                 helicopter.x += 1;
-                if (helicopter.x + HELICOPTER_SIZE.width >= rightBorder.current) {
+                if (helicopter.x + objects['helicopter'].size.width >= rightBorder) {
                   helicopter.direction = 'rtl';
                 }
               } else {
                 helicopter.x -= 1;
-                if (helicopter.x <= leftBorder.current) {
+                if (helicopter.x <= leftBorder) {
                   helicopter.direction = 'ltr';
                 }
               }
@@ -432,14 +437,27 @@ console.log('1');}
     }
   }, [isGameRunning.current]);
 
-  const initSegment = () => {
-    const segments = riverSegmentGenerator(screenWidth, RIVER_MIN_WIDTH_RATIO, RIVER_MAX_WIDTH_RATIO, screenHeight / 2, screenHeight * 5, 100, 50, { seedW: 1, seedH: 2, seedTree: 3, seedBridge: 1, seedHelicopter: 10 }, HELICOPTER_SIZE.width);
+  const objects = {
+    tree: {
+      seed: 3,
+      size: { width: 50, height: 50 },
+      movement: 'fixed',
+    },
+    helicopter: {
+      seed: 10,
+      size: { width: 50, height: 50 },
+      movement: 'shuttle',
+    }
+  };
+
+  const initSegments = () => {
+    const segments = riverSegmentGenerator(screenWidth, RIVER_MIN_WIDTH_RATIO, RIVER_MAX_WIDTH_RATIO, screenHeight / 2, screenHeight * 5, 100, 50, { seedW: 1, seedH: 2, seedBridge: 1 }, objects);
     setRiverSegments(segments);
   };
 
   useEffect(() => {
     const generateRiver = () => {
-      initSegment();
+      initSegments();
     };
 
     generateRiver();
@@ -480,15 +498,15 @@ console.log('1');}
   const renderHelicopters = () =>
     segmentsInRange().
       map((segment, index) =>
-        segment.helicopters.filter(_ => !_.destroyed).map((helicopter, index2) => {
+        segment.objects.filter(_ => _.type === 'helicopter' && !_.destroyed).map((helicopter, index2) => {
           return (
             <Image
               key={`Helicopter-${index}-${index2}`}
               source={helicopter.direction === 'ltr' ? helicopterLtrImage : helicopterRtlImage}
               style={{
                 position: 'absolute',
-                width: HELICOPTER_SIZE.width,
-                height: HELICOPTER_SIZE.height,
+                width: objects['helicopter'].size.width,
+                height: objects['helicopter'].size.height,
                 left: helicopter.x,
                 top: mapY(helicopter.y + segment.offset),
               }}
@@ -552,6 +570,7 @@ console.log('1');}
           })}
           {/* helicopters */}
           {renderHelicopters()}
+          {/* explosions */}
           {explosions.current.map((explosion, index) => (
             <Explosion key={index} x={explosion.x} y={explosion.y - explosion.refPosition + bottomOfTheRiverRef.current} />
           ))}
