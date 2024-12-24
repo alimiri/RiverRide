@@ -74,14 +74,14 @@ export default function generateRiverSegments(
             _objects.push(bridge);
         }
 
-        //generate trees and helicopters
-        Object.keys(objects).filter(objectType => ['tree', 'helicopter'].includes(objectType)).forEach(objectType => {
-            const randomTree = new SeededRandom(objects[objectType].seed);
-            const nObjects = objects[objectType].minNumber + Math.round(randomTree.next() * (objects[objectType].maxNumber - objects[objectType].minNumber));
+        //generate trees and helicopters, gasStation, airplane
+        Object.keys(objects).filter(objectType => ['tree', 'helicopter','gasStation','airplane'].includes(objectType)).forEach(objectType => {
+            const randomGen = new SeededRandom(objects[objectType].seed);
+            const nObjects = objects[objectType].minNumber + Math.round(randomGen.next() * (objects[objectType].maxNumber - objects[objectType].minNumber));
             for (let j = 0; j < nObjects; j++) {
                 let y;
                 do {
-                    y = Math.floor(randomTree.next() * length);
+                    y = Math.floor(randomGen.next() * length);
                 } while (i === 0 && y < 200);
                 const interpolatedWidth = startWidth + ((endWidth - startWidth) * y) / length;
 
@@ -89,18 +89,28 @@ export default function generateRiverSegments(
                 const rightBorder = leftBorder + interpolatedWidth;
 
                 let x;
-                let direction = objects[objectType].movement === 'shuttle' ? (randomTree.next() > 0.5 ? 'ltr' : 'rtl') : undefined;
+                let direction = objects[objectType].movement !== 'still' ? (randomGen.next() > 0.5 ? 'ltr' : 'rtl') : undefined;
                 if(objects[objectType].movement === 'still') {
-                    if (randomTree.next() < 0.5) {
-                        x = Math.floor(randomTree.next() * (leftBorder - objects[objectType].size.width));
+                    if(objectType === 'tree') {
+                        if (randomGen.next() < 0.5) {
+                            x = Math.floor(randomGen.next() * (leftBorder - objects[objectType].size.width)) + objects[objectType].size.width / 2;
+                        } else {
+                            x = Math.floor(randomGen.next() * (screenWidth - rightBorder - objects[objectType].size.width)) + rightBorder + objects[objectType].size.width / 2;
+                        }
                     } else {
-                        x = Math.floor(randomTree.next() * (screenWidth - rightBorder - objects[objectType].size.width)) + rightBorder + objects[objectType].size.width;
+                        x = leftBorder + Math.floor(randomGen.next() * (interpolatedWidth - objects[objectType].size.width)) + objects[objectType].size.width / 2;
                     }
                 } else if(objects[objectType].movement === 'shuttle') {
                     if(direction === 'ltr') {
                         x = (screenWidth - (startWidth + (endWidth - startWidth) * y / length)) / 2;
                     } else {
                         x = screenWidth - (screenWidth - (startWidth + (endWidth - startWidth) * y / length)) / 2 - objects[objectType].size.width;
+                    }
+                } else if(objects[objectType].movement === 'oneWay') {
+                    if(direction === 'ltr') {
+                        x = objects[objectType].size.width / 2;
+                    } else {
+                        x = screenWidth - objects[objectType].size.width / 2;
                     }
                 }
                 _objects.push({type: objectType, x, y, direction });
