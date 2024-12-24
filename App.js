@@ -19,6 +19,7 @@ import gasStationImage from './assets/gas-station.png';
 const airplaneEngineEffect = require('./assets/airplane-engine.mp3');
 const explosionEffect = require('./assets/explosion.mp3');
 const emergencyAlarm = require('./assets/emergency-alarm.mp3');
+const beepEffect = require('./assets/beep.mp3');
 
 const AIRPLANE_SIZE = { width: 50, height: 50 };
 const SPEED_INIT = 50;
@@ -156,10 +157,12 @@ export default function App() {
     if ((!effect || effect === 'airplane') && soundRef.current) {
       await soundRef.current.stopAsync();
       await soundRef.current.unloadAsync();
+      soundRef.current = null;
     }
-    if ((!effect || effect === 'emergency') && soundRef.current) {
+    if ((!effect || effect === 'emergency') && emergencySoundRef.current) {
       await emergencySoundRef.current.stopAsync();
       await emergencySoundRef.current.unloadAsync();
+      emergencySoundRef.current = null;
     }
   };
 
@@ -170,19 +173,25 @@ export default function App() {
       if (effect === 'airplane') {
         soundEffect = airplaneEngineEffect;
         params = { shouldPlay: true, isLooping: true };
-        const { sound } = await Audio.Sound.createAsync(soundEffect, params);
-        soundRef.current = sound;
+        Audio.Sound.createAsync(soundEffect, params).then((sound) => {
+          soundRef.current = sound;
+        });
       } else if (effect === 'emergency') {
         soundEffect = emergencyAlarm;
         params = { shouldPlay: true, isLooping: true };
-        const { sound } = await Audio.Sound.createAsync(soundEffect, params);
-        emergencySoundRef.current = sound;
-      } else {
+        Audio.Sound.createAsync(soundEffect, params).then((sound) => {
+          emergencySoundRef.current = sound;
+        });
+      } else  if (effect === 'explosion') {
         soundEffect = explosionEffect
         params = { shouldPlay: true, isLooping: false };
-        await Audio.Sound.createAsync(soundEffect, params);
-      }
-    };
+        Audio.Sound.createAsync(soundEffect, params);
+      } else  if (effect === 'beep') {
+        soundEffect = beepEffect
+        params = { shouldPlay: true, isLooping: false };
+        Audio.Sound.createAsync(soundEffect, params);
+    }
+  };
 
     loadSound();
   };
@@ -264,6 +273,7 @@ export default function App() {
       if (object) {
         if(object.type === 'gasStation') {
           fuel.current = Math.min(fuel.current + 1, FUEL_INIT);
+          startSound('beep');
           if(fuel.current > FUEL_EMERGENCY_THRESHOLD && emergencySoundRef.current) {
             stopSound('emergency');
           }
@@ -326,6 +336,7 @@ export default function App() {
     playerPosition.current = initialPosition.current; // Reset the player position
     fuel.current = FUEL_INIT; // Reset fuel
     speed.current = SPEED_INIT; // Reset speed
+    score.current = 0; // Reset score
     setResetFlag((prev) => !prev);
     isAirplaneVisible.current = true;
     bottomOfTheRiverRef.current = 0;
@@ -427,7 +438,7 @@ export default function App() {
               }
             } else {
               opponent.x -= objects[opponent.type].speed;
-              if (objects[opponent.type].movement === 'shuttle' && opponent.x <= leftBorder) {
+              if (objects[opponent.type].movement === 'shuttle' && opponent.x - objects[opponent.type].size.width / 2 <= leftBorder) {
                 opponent.direction = 'ltr';
               } else if (objects[opponent.type].movement === 'oneWay' && opponent.x <= -objects[opponent.type].size.width / 2) {
                 opponent.destroyed = true;
@@ -502,8 +513,8 @@ export default function App() {
                 position: 'absolute',
                 width: objects[object.type].size.width,
                 height: objects[object.type].size.height,
-                left: object.x,
-                top: mapY(object.y + segment.offset),
+                left: object.x - objects[object.type].size.width / 2,
+                top: mapY(object.y + segment.offset) - objects[object.type].size.height / 2,
               }}
             />
           );
