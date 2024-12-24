@@ -18,6 +18,7 @@ import gasStationImage from './assets/gas-station.png';
 
 const airplaneEngineEffect = require('./assets/airplane-engine.mp3');
 const explosionEffect = require('./assets/explosion.mp3');
+const emergencyAlarm = require('./assets/emergency-alarm.mp3');
 
 const AIRPLANE_SIZE = { width: 50, height: 50 };
 const SPEED_INIT = 50;
@@ -27,6 +28,7 @@ const SPEED_INCREASE_STEP = 5;
 const SPEED_BACK_TIMING = 100;
 
 const FUEL_INIT = 50;
+const FUEL_EMERGENCY_THRESHOLD = 15;
 
 const BULLET_SPEED = 5;
 const BULLET_SIZE = { width: 2, height: 3 };
@@ -54,6 +56,9 @@ export default function App() {
   const airplaneYRelative = useRef(0);
   const bottomOfTheRiverRef = useRef(0);
   const memoizedStyles = useMemo(() => styles(screenWidth, screenHeight), [screenWidth, screenHeight]);
+  const soundRef = useRef(null);
+  const emergencySoundRef = useRef(null);
+
 
   const RIVER_MAX_WIDTH_RATIO = screenWidth * 0.9; // Maximum width of the river
   const RIVER_MIN_WIDTH_RATIO = AIRPLANE_SIZE.width * 2; // Maximum width of the river
@@ -147,13 +152,14 @@ export default function App() {
     );
   };
 
-  // sound system
-  const soundRef = useRef(null); // Reference for sound instance
-
-  const stopSound = async () => {
-    if (soundRef.current) {
+  const stopSound = async (effect) => {
+    if ((!effect || effect === 'airplane') && soundRef.current) {
       await soundRef.current.stopAsync();
       await soundRef.current.unloadAsync();
+    }
+    if ((!effect || effect === 'emergency') && soundRef.current) {
+      await emergencySoundRef.current.stopAsync();
+      await emergencySoundRef.current.unloadAsync();
     }
   };
 
@@ -166,6 +172,11 @@ export default function App() {
         params = { shouldPlay: true, isLooping: true };
         const { sound } = await Audio.Sound.createAsync(soundEffect, params);
         soundRef.current = sound;
+      } else if (effect === 'emergency') {
+        soundEffect = emergencyAlarm;
+        params = { shouldPlay: true, isLooping: true };
+        const { sound } = await Audio.Sound.createAsync(soundEffect, params);
+        emergencySoundRef.current = sound;
       } else {
         soundEffect = explosionEffect
         params = { shouldPlay: true, isLooping: false };
@@ -252,9 +263,11 @@ export default function App() {
       });
       if (object) {
         if(object.type === 'gasStation') {
-        fuel.current = Math.min(fuel.current + 1, FUEL_INIT);
+          fuel.current = Math.min(fuel.current + 1, FUEL_INIT);
+          if(fuel.current > FUEL_EMERGENCY_THRESHOLD && emergencySoundRef.current) {
+            stopSound('emergency');
+          }
         } else {
-          stopSound();
           startSound('explosion');
           addExplosion(playerPosition.current.x, playerPosition.current.y, bottomOfTheRiverRef.current);
           addExplosion(object.x, mapY(object.y + segment.offset), bottomOfTheRiverRef.current);
@@ -278,20 +291,18 @@ export default function App() {
     if (!isGameRunning.current || endGameHandleRef.current) return true;
 
     if (xPosition < leftBorder.current + AIRPLANE_SIZE.width / 2 || xPosition > rightBorder.current - AIRPLANE_SIZE.width / 2) {
-      handleEndGame('border');
-
       isAirplaneVisible.current = false;
-      stopSound();
       startSound('explosion');
       addExplosion(playerPosition.current.x, playerPosition.current.y, bottomOfTheRiverRef.current);
-
+      handleEndGame('border');
       return true;
+    } else {
+      return false;
     }
-
-    return false;
   };
 
   const handleEndGame = (barrier) => {
+    stopSound();
     if (endGameHandleRef.current) return; // Ensure only one collision is handled
     endGameHandleRef.current = true; // Set flag to prevent duplicate alerts
 
@@ -330,6 +341,11 @@ export default function App() {
 
     const interval = setInterval(() => {
         fuel.current --;
+        if(fuel.current <= FUEL_EMERGENCY_THRESHOLD && !emergencySoundRef.current) {
+          startSound('emergency');
+        } else if(fuel.current > FUEL_EMERGENCY_THRESHOLD && emergencySoundRef.current) {
+          stopSound('emergency');
+        }
         if (fuel.current === 0) {
           handleEndGame('fuel');
         }
@@ -362,7 +378,6 @@ export default function App() {
               //check for bullet to the bridge collision
                 const bridge = segment.objects.find(bridge => {
                   if (bridge.type === 'bridge' && !bridge.destroyed && bulletYRelative >= bridge.points[0][0].y + segment.offset) {
-                    //stopSound();
                     startSound('explosion');
                     addExplosion(bridge.points[5][0].x + (bridge.points[5][1].x - bridge.points[5][0].x) / 4, mapY(bridge.points[5][0].y + segment.offset), bottomOfTheRiverRef.current);
                     addExplosion(bridge.points[5][0].x + (bridge.points[5][1].x - bridge.points[5][0].x) * 3 / 4, mapY(bridge.points[5][0].y + segment.offset), bottomOfTheRiverRef.current);
