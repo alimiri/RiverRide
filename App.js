@@ -521,8 +521,8 @@ export default function App() {
     <View style={{ flex: 1, position: 'relative' }}>
       <View style={memoizedStyles.container}>
         <View style={memoizedStyles.infoStrip}>
-          <Text style={memoizedStyles.infoText}>Score: {airplaneYRelative.current}</Text>
-          <Text style={memoizedStyles.infoText}>Speed: {bottomOfTheRiverRef.current}</Text>
+          <Text style={memoizedStyles.infoText}>Score: {score}</Text>
+          <Text style={memoizedStyles.infoText}>Speed: {speed.current}</Text>
           <Text style={memoizedStyles.infoText}>Fuel: {fuel}</Text>
         </View>
 
