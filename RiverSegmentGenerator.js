@@ -61,6 +61,10 @@ export default function generateRiverSegments(
             const y1 = length / 2 - 50;
             const y2 = length / 2 + 50;
             const yIncrement = (y2 - y1) / 10;
+            bridge.y = (y1 + y2) / 2;
+            bridge.height = y2 - y1;
+            bridge.x = screenWidth / 2;
+            bridge.width = startWidth + (endWidth - startWidth) * y1 / length;
 
             for(let j = 0; j < 10; j++) {
                 const aPoints = [];

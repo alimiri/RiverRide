@@ -20,6 +20,7 @@ const airplaneEngineEffect = require('./assets/airplane-engine.mp3');
 const explosionEffect = require('./assets/explosion.mp3');
 const emergencyAlarm = require('./assets/emergency-alarm.mp3');
 const beepEffect = require('./assets/beep.mp3');
+const explosionJson = require('./assets/explosion2.json');
 
 const AIRPLANE_SIZE = { width: 50, height: 50 };
 const SPEED_INIT = 50;
@@ -57,8 +58,7 @@ export default function App() {
   const airplaneYRelative = useRef(0);
   const bottomOfTheRiverRef = useRef(0);
   const memoizedStyles = useMemo(() => styles(screenWidth, screenHeight), [screenWidth, screenHeight]);
-  const soundRef = useRef(null);
-  const emergencySoundRef = useRef(null);
+  const soundRef = useRef({});
 
 
   const RIVER_MAX_WIDTH_RATIO = screenWidth * 0.9; // Maximum width of the river
@@ -139,7 +139,7 @@ export default function App() {
   const Explosion = ({ x, y }) => {
     return (
       <LottieView
-        source={require('./assets/explosion2.json')}
+        source={explosionJson}
         autoPlay
         loop={false}
         style={{
@@ -153,47 +153,58 @@ export default function App() {
     );
   };
 
+  const soundEffects = {
+    airplane: {
+      effect: airplaneEngineEffect,
+      isLooping: true,
+    },
+    emergency: {
+      effect: emergencyAlarm,
+      isLooping: false,
+      duration: 1000,
+    },
+    explosion: {
+      effect: explosionEffect,
+      isLooping: false,
+      duration: 1000,
+    },
+    beep: {
+      effect: beepEffect,
+      isLooping: false,
+      duration: 1000,
+    },
+  };
+
   const stopSound = async (effect) => {
-    if ((!effect || effect === 'airplane') && soundRef.current) {
-      await soundRef.current.stopAsync();
-      await soundRef.current.unloadAsync();
-      soundRef.current = null;
+    const stop = async effect => {
+      await soundRef.current[effect].stopAsync();
+      await soundRef.current[effect].unloadAsync();
+      soundRef.current.delete(effect);
+    };
+    if (effect && soundRef.current[effect]) {
+      stop(effect)
     }
-    if ((!effect || effect === 'emergency') && emergencySoundRef.current) {
-      await emergencySoundRef.current.stopAsync();
-      await emergencySoundRef.current.unloadAsync();
-      emergencySoundRef.current = null;
+    else if (!effect) {
+      Object.keys(soundRef.current).forEach(async (key) => {
+      stop(key);
+    });
     }
   };
 
   const startSound = (effect) => {
     const loadSound = async () => {
-      let soundEffect = null;
-      let params = null;
-      if (effect === 'airplane') {
-        soundEffect = airplaneEngineEffect;
-        params = { shouldPlay: true, isLooping: true };
-        Audio.Sound.createAsync(soundEffect, params).then((sound) => {
-          soundRef.current = sound;
+        Audio.Sound.createAsync(soundEffects[effect].effect, { shouldPlay: true, isLooping: soundEffects[effect].isLooping }).then(({sound}) => {
+          soundRef.current[effect] = sound;
+          if(soundEffects[effect].duration) {
+            setTimeout(() => {
+              stopSound(effect);
+            }, soundEffects[effect].duration);
+          }
         });
-      } else if (effect === 'emergency') {
-        soundEffect = emergencyAlarm;
-        params = { shouldPlay: true, isLooping: true };
-        Audio.Sound.createAsync(soundEffect, params).then((sound) => {
-          emergencySoundRef.current = sound;
-        });
-      } else  if (effect === 'explosion') {
-        soundEffect = explosionEffect
-        params = { shouldPlay: true, isLooping: false };
-        Audio.Sound.createAsync(soundEffect, params);
-      } else  if (effect === 'beep') {
-        soundEffect = beepEffect
-        params = { shouldPlay: true, isLooping: false };
-        Audio.Sound.createAsync(soundEffect, params);
+    };
+    if(!soundRef.current[effect]) {
+      loadSound();
     }
-  };
-
-    loadSound();
   };
 
   const handleShoot = () => {
@@ -274,7 +285,7 @@ export default function App() {
         if(object.type === 'gasStation') {
           fuel.current = Math.min(fuel.current + 1, FUEL_INIT);
           startSound('beep');
-          if(fuel.current > FUEL_EMERGENCY_THRESHOLD && emergencySoundRef.current) {
+          if(fuel.current > FUEL_EMERGENCY_THRESHOLD) {
             stopSound('emergency');
           }
         } else {
@@ -352,9 +363,9 @@ export default function App() {
 
     const interval = setInterval(() => {
         fuel.current --;
-        if(fuel.current <= FUEL_EMERGENCY_THRESHOLD && !emergencySoundRef.current) {
+        if(fuel.current <= FUEL_EMERGENCY_THRESHOLD) {
           startSound('emergency');
-        } else if(fuel.current > FUEL_EMERGENCY_THRESHOLD && emergencySoundRef.current) {
+        } else if(fuel.current > FUEL_EMERGENCY_THRESHOLD) {
           stopSound('emergency');
         }
         if (fuel.current === 0) {
