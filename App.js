@@ -157,55 +157,89 @@ export default function App() {
     airplane: {
       effect: airplaneEngineEffect,
       isLooping: true,
+      multiple: 1,
     },
     emergency: {
       effect: emergencyAlarm,
       isLooping: false,
       duration: 1000,
+      multiple: 1,
     },
     explosion: {
       effect: explosionEffect,
       isLooping: false,
       duration: 1000,
+      multiple: 3,
     },
     beep: {
       effect: beepEffect,
       isLooping: false,
-      duration: 1000,
+      duration: 200,
+      multiple: 3,
     },
   };
 
-  const stopSound = async (effect) => {
-    const stop = async effect => {
-      await soundRef.current[effect].stopAsync();
-      await soundRef.current[effect].unloadAsync();
-      soundRef.current.delete(effect);
+  const stopSound = async (effect, clearAll) => {
+    const stop = async (effect, clearAll) => {
+      do {
+        await soundRef.current[effect][0].stopAsync();
+        await soundRef.current[effect][0].unloadAsync();
+        soundRef.current[effect].splice(0,1);
+      } while (clearAll && soundRef.current[effect].length > 0);
     };
-    if (effect && soundRef.current[effect]) {
-      stop(effect)
-    }
-    else if (!effect) {
+    if (effect && soundRef.current[effect] && soundRef.current[effect].length) {
+      stop(effect, clearAll)
+    } else if (!effect) {
       Object.keys(soundRef.current).forEach(async (key) => {
-      stop(key);
+        if (soundRef.current[key].length) {
+          stop(key, true);
+        }
     });
     }
   };
 
+  const semaphoreRef = useRef({}); // Semaphore as a ref object
+
   const startSound = (effect) => {
-    const loadSound = async () => {
-        Audio.Sound.createAsync(soundEffects[effect].effect, { shouldPlay: true, isLooping: soundEffects[effect].isLooping }).then(({sound}) => {
-          soundRef.current[effect] = sound;
-          if(soundEffects[effect].duration) {
-            setTimeout(() => {
-              stopSound(effect);
-            }, soundEffects[effect].duration);
+      const loadSound = async () => {
+          try {
+              const { sound } = await Audio.Sound.createAsync(
+                  soundEffects[effect].effect,
+                  { shouldPlay: true, isLooping: soundEffects[effect].isLooping }
+              );
+
+              if (soundRef.current[effect]) {
+                  soundRef.current[effect].push(sound);
+              } else {
+                  soundRef.current[effect] = [sound];
+              }
+
+              if (soundEffects[effect].duration) {
+                  setTimeout(() => {
+                      stopSound(effect);
+                  }, soundEffects[effect].duration);
+              }
+          } finally {
+              // Release the semaphore
+              semaphoreRef.current[effect] = false;
           }
-        });
-    };
-    if(!soundRef.current[effect]) {
-      loadSound();
-    }
+      };
+
+      // Prevent simultaneous executions
+      if (semaphoreRef.current[effect]) {
+          return;
+      }
+
+      if (
+          !soundRef.current[effect] ||
+          soundRef.current[effect].length < soundEffects[effect].multiple
+      ) {
+          semaphoreRef.current[effect] = true; // Acquire semaphore
+          loadSound();
+      } else {
+      }
   };
+
 
   const handleShoot = () => {
     if (!isGameRunning.current) {
@@ -249,33 +283,21 @@ export default function App() {
         //playerPosition.current = {x: rightBorder.current - AIRPLANE_SIZE.width / 2, y: initialPosition.current.y};
       }
 
-      //check bridge collision
-      const bridge = segment.objects.find(object => {
-      if (object.type === 'bridge' && !object.destroyed && airplaneYRelative.current >= object.points[0][0].y + segment.offset) {
-        stopSound();
-        startSound('explosion');
-        addExplosion(playerPosition.current.x, playerPosition.current.y, bottomOfTheRiverRef.current);
-        isAirplaneVisible.current = false;
-        return true;
-      }
-      });
       if (!isGameRunning.current || playerPosition.current.x === 0) return;
-      if (bridge) {
-        handleEndGame('bridge');
-        return true;
-      }
       //check helicopter collision
-      const object = segment.objects.filter(_ => ['helicopter', 'airplane', 'gasStation'].includes(_.type)).find(object => {
+      const object = segment.objects.filter(_ => ['helicopter', 'airplane', 'gasStation','bridge'].includes(_.type)).find(object => {
         if (object.destroyed) {
           return false;
         }
         let yCollide = false;
         let xCollide = false;
-        if(airplaneYRelative.current + AIRPLANE_SIZE.height / 2 >= object.y + segment.offset - objects[object.type].size.height / 2 && airplaneYRelative.current - AIRPLANE_SIZE.height / 2 <= object.y + segment.offset + objects[object.type].size.height / 2) {
+        const height = objects[object.type].size ? objects[object.type].size.height : object.height;
+        const width = objects[object.type].size ? objects[object.type].size.width : object.width;
+        if(airplaneYRelative.current + AIRPLANE_SIZE.height / 2 >= object.y + segment.offset - height / 2 && airplaneYRelative.current - AIRPLANE_SIZE.height / 2 <= object.y + segment.offset + height / 2) {
           yCollide = true;
         }
         if(yCollide) {
-          if(playerPosition.current.x + AIRPLANE_SIZE.width / 2 >= object.x - objects[object.type].size.width / 2 && playerPosition.current.x - AIRPLANE_SIZE.width / 2 <= object.x + objects[object.type].size.width / 2) {
+          if(playerPosition.current.x + AIRPLANE_SIZE.width / 2 >= object.x - width / 2 && playerPosition.current.x - AIRPLANE_SIZE.width / 2 <= object.x + width / 2) {
             xCollide = true;
           }
         }
@@ -397,33 +419,22 @@ export default function App() {
               const bulletYRelative = bottomOfTheRiverRef.current + 50 + AIRPLANE_SIZE.height + playerPosition.current.y - AIRPLANE_SIZE.height / 2 - bullet.y;
               let found = false;
               segmentsInRange().forEach(segment => {
-              //check for bullet to the bridge collision
-                const bridge = segment.objects.find(bridge => {
-                  if (bridge.type === 'bridge' && !bridge.destroyed && bulletYRelative >= bridge.points[0][0].y + segment.offset) {
-                    startSound('explosion');
-                    addExplosion(bridge.points[5][0].x + (bridge.points[5][1].x - bridge.points[5][0].x) / 4, mapY(bridge.points[5][0].y + segment.offset), bottomOfTheRiverRef.current);
-                    addExplosion(bridge.points[5][0].x + (bridge.points[5][1].x - bridge.points[5][0].x) * 3 / 4, mapY(bridge.points[5][0].y + segment.offset), bottomOfTheRiverRef.current);
-                    return true;
-                  }
-                });
-                if (bridge) {
-                  score.current += objects[bridge.type].score;
-                  bridge.destroyed = true;
-                  found = true;
-                }
-
                 //check for bullet to the opponent collision
-                const opponent = segment.objects.find(opponent =>
-                      ['helicopter', 'airplane', 'gasStation'].includes(opponent.type) && !opponent.destroyed &&
-                      bulletYRelative >= opponent.y - objects[opponent.type].size.height / 2 + segment.offset &&
-                      bulletYRelative <= opponent.y + objects[opponent.type].size.height / 2 + segment.offset &&
-                      bullet.x >= opponent.x - objects[opponent.type].size.width / 2 &&
-                      bullet.x <= opponent.x + objects[opponent.type].size.width / 2);
-                if (opponent) {
-                    score.current += objects[opponent.type].score;
+                const object = segment.objects.find(object => {
+                  const height = objects[object.type].size ? objects[object.type].size.height : object.height;
+                  const width = objects[object.type].size ? objects[object.type].size.width : object.width;
+
+                  return ['helicopter', 'airplane', 'gasStation','bridge'].includes(object.type) && !object.destroyed &&
+                    bulletYRelative >= object.y - height / 2 + segment.offset &&
+                    bulletYRelative <= object.y + height / 2 + segment.offset &&
+                    bullet.x >= object.x - width / 2 &&
+                    bullet.x <= object.x + width / 2;
+                });
+                if (object) {
+                    score.current += objects[object.type].score;
                     startSound('explosion');
                     addExplosion(bullet.x, bullet.y, bottomOfTheRiverRef.current);
-                    opponent.destroyed = true;
+                    object.destroyed = true;
                     found = true;
                 }
               });
