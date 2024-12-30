@@ -3,7 +3,6 @@ import { View, Text, Dimensions, Image, Alert, TouchableWithoutFeedbackBase } fr
 import MovementArea from './MovementArea'; // Import the new MovementArea
 import riverSegmentGenerator from './RiverSegmentGenerator'; // Import the riverSegmentGenerator
 import ScrollingBackground from './ScrollingBackground';  // Import the scrolling background
-import ShootButton from './ShootButton';
 import LottieView from 'lottie-react-native';
 import { Audio } from 'expo-av';
 import Svg, { Polygon } from 'react-native-svg';
@@ -49,7 +48,6 @@ export default function App() {
   const endGameHandleRef = useRef(false);
   const [resetFlag, setResetFlag] = useState(false);
   const explosions = useRef([]);
-  const [explosionSound, setExplosionSound] = useState(null);
   const isAirplaneVisible = useRef(true);
 
   const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -59,7 +57,7 @@ export default function App() {
   const bottomOfTheRiverRef = useRef(0);
   const memoizedStyles = useMemo(() => styles(screenWidth, screenHeight), [screenWidth, screenHeight]);
   const soundRef = useRef({});
-
+  const [isShooting, setIsShooting] = useState(false);
 
   const RIVER_MAX_WIDTH_RATIO = screenWidth * 0.9; // Maximum width of the river
   const RIVER_MIN_WIDTH_RATIO = AIRPLANE_SIZE.width * 2; // Maximum width of the river
@@ -69,7 +67,7 @@ export default function App() {
       seed: 3,
       size: { width: 50, height: 50 },
       movement: 'still',
-      image: {still: treeImage},
+      image: { still: treeImage },
       minNumber: 5,
       maxNumber: 10,
     },
@@ -77,26 +75,26 @@ export default function App() {
       seed: 10,
       size: { width: 50, height: 50 },
       movement: 'shuttle',
-      image: {ltr: helicopterLtrImage, rtl: helicopterRtlImage},
+      image: { ltr: helicopterLtrImage, rtl: helicopterRtlImage },
       minNumber: 1,
       maxNumber: 4,
-      speed:1,
+      speed: 1,
       score: 10,
     },
     gasStation: {
       seed: 5,
       size: { width: 50, height: 100 },
       movement: 'still',
-      image: {still: gasStationImage},
+      image: { still: gasStationImage },
       minNumber: 1,
       maxNumber: 1,
       score: 50,
     },
     airplane: {
       seed: 15,
-      size: {width: 50, height: 55},
+      size: { width: 50, height: 55 },
       movement: 'oneWay',
-      image: {ltr: airplaneLtrImage, rtl: airplaneRtlImage},
+      image: { ltr: airplaneLtrImage, rtl: airplaneRtlImage },
       minNumber: 1,
       maxNumber: 2,
       speed: 3,
@@ -169,7 +167,7 @@ export default function App() {
       effect: explosionEffect,
       isLooping: false,
       duration: 1000,
-      multiple: 3,
+      multiple: 5,
     },
     beep: {
       effect: beepEffect,
@@ -184,7 +182,7 @@ export default function App() {
       do {
         await soundRef.current[effect][0].stopAsync();
         await soundRef.current[effect][0].unloadAsync();
-        soundRef.current[effect].splice(0,1);
+        soundRef.current[effect].splice(0, 1);
       } while (clearAll && soundRef.current[effect].length > 0);
     };
     if (effect && soundRef.current[effect] && soundRef.current[effect].length) {
@@ -194,50 +192,50 @@ export default function App() {
         if (soundRef.current[key].length) {
           stop(key, true);
         }
-    });
+      });
     }
   };
 
   const semaphoreRef = useRef({}); // Semaphore as a ref object
 
   const startSound = (effect) => {
-      const loadSound = async () => {
-          try {
-              const { sound } = await Audio.Sound.createAsync(
-                  soundEffects[effect].effect,
-                  { shouldPlay: true, isLooping: soundEffects[effect].isLooping }
-              );
+    const loadSound = async () => {
+      try {
+        const { sound } = await Audio.Sound.createAsync(
+          soundEffects[effect].effect,
+          { shouldPlay: true, isLooping: soundEffects[effect].isLooping }
+        );
 
-              if (soundRef.current[effect]) {
-                  soundRef.current[effect].push(sound);
-              } else {
-                  soundRef.current[effect] = [sound];
-              }
+        if (soundRef.current[effect]) {
+          soundRef.current[effect].push(sound);
+        } else {
+          soundRef.current[effect] = [sound];
+        }
 
-              if (soundEffects[effect].duration) {
-                  setTimeout(() => {
-                      stopSound(effect);
-                  }, soundEffects[effect].duration);
-              }
-          } finally {
-              // Release the semaphore
-              semaphoreRef.current[effect] = false;
-          }
-      };
-
-      // Prevent simultaneous executions
-      if (semaphoreRef.current[effect]) {
-          return;
+        if (soundEffects[effect].duration) {
+          setTimeout(() => {
+            stopSound(effect);
+          }, soundEffects[effect].duration);
+        }
+      } finally {
+        // Release the semaphore
+        semaphoreRef.current[effect] = false;
       }
+    };
 
-      if (
-          !soundRef.current[effect] ||
-          soundRef.current[effect].length < soundEffects[effect].multiple
-      ) {
-          semaphoreRef.current[effect] = true; // Acquire semaphore
-          loadSound();
-      } else {
-      }
+    // Prevent simultaneous executions
+    if (semaphoreRef.current[effect]) {
+      return;
+    }
+
+    if (
+      !soundRef.current[effect] ||
+      soundRef.current[effect].length < soundEffects[effect].multiple
+    ) {
+      semaphoreRef.current[effect] = true; // Acquire semaphore
+      loadSound();
+    } else {
+    }
   };
 
 
@@ -249,7 +247,7 @@ export default function App() {
       return;
     }
 
-    const bullet = {x: playerPosition.current.x, y: playerPosition.current.y - AIRPLANE_SIZE.height / 2};
+    const bullet = { x: playerPosition.current.x, y: playerPosition.current.y - AIRPLANE_SIZE.height / 2 };
 
     setBullets((prevBullets) => [...prevBullets, bullet]);
   };
@@ -285,7 +283,7 @@ export default function App() {
 
       if (!isGameRunning.current || playerPosition.current.x === 0) return;
       //check helicopter collision
-      const object = segment.objects.filter(_ => ['helicopter', 'airplane', 'gasStation','bridge'].includes(_.type)).find(object => {
+      const object = segment.objects.filter(_ => ['helicopter', 'airplane', 'gasStation', 'bridge'].includes(_.type)).find(object => {
         if (object.destroyed) {
           return false;
         }
@@ -293,21 +291,21 @@ export default function App() {
         let xCollide = false;
         const height = objects[object.type].size ? objects[object.type].size.height : object.height;
         const width = objects[object.type].size ? objects[object.type].size.width : object.width;
-        if(airplaneYRelative.current + AIRPLANE_SIZE.height / 2 >= object.y + segment.offset - height / 2 && airplaneYRelative.current - AIRPLANE_SIZE.height / 2 <= object.y + segment.offset + height / 2) {
+        if (airplaneYRelative.current + AIRPLANE_SIZE.height / 2 >= object.y + segment.offset - height / 2 && airplaneYRelative.current - AIRPLANE_SIZE.height / 2 <= object.y + segment.offset + height / 2) {
           yCollide = true;
         }
-        if(yCollide) {
-          if(playerPosition.current.x + AIRPLANE_SIZE.width / 2 >= object.x - width / 2 && playerPosition.current.x - AIRPLANE_SIZE.width / 2 <= object.x + width / 2) {
+        if (yCollide) {
+          if (playerPosition.current.x + AIRPLANE_SIZE.width / 2 >= object.x - width / 2 && playerPosition.current.x - AIRPLANE_SIZE.width / 2 <= object.x + width / 2) {
             xCollide = true;
           }
         }
         return yCollide && xCollide;
       });
       if (object) {
-        if(object.type === 'gasStation') {
+        if (object.type === 'gasStation') {
           fuel.current = Math.min(fuel.current + 1, FUEL_INIT);
           startSound('beep');
-          if(fuel.current > FUEL_EMERGENCY_THRESHOLD) {
+          if (fuel.current > FUEL_EMERGENCY_THRESHOLD) {
             stopSound('emergency');
           }
         } else {
@@ -375,7 +373,7 @@ export default function App() {
     bottomOfTheRiverRef.current = 0;
     //restore bridges and helicopters
     riverSegments.river.forEach(segment => {
-      segment.objects.forEach(object => {object.destroyed = false;});
+      segment.objects.forEach(object => { object.destroyed = false; });
     });
     setBullets(() => []);
   };
@@ -384,16 +382,19 @@ export default function App() {
     if (!isGameRunning.current) return;
 
     const interval = setInterval(() => {
-        fuel.current --;
-        if(fuel.current <= FUEL_EMERGENCY_THRESHOLD) {
-          startSound('emergency');
-        } else if(fuel.current > FUEL_EMERGENCY_THRESHOLD) {
-          stopSound('emergency');
-        }
-        if (fuel.current === 0) {
-          handleEndGame('fuel');
-        }
-      }, 1000);
+      fuel.current--;
+      if (fuel.current <= FUEL_EMERGENCY_THRESHOLD) {
+        startSound('emergency');
+      } else if (fuel.current > FUEL_EMERGENCY_THRESHOLD) {
+        stopSound('emergency');
+      }
+      if (fuel.current === 0) {
+        startSound('explosion');
+        addExplosion(playerPosition.current.x, playerPosition.current.y, bottomOfTheRiverRef.current);
+        isAirplaneVisible.current = false;
+        handleEndGame('fuel');
+      }
+    }, 1000);
 
     return () => clearInterval(interval); // Cleanup interval on component unmount
   }, [isGameRunning.current]);
@@ -414,7 +415,7 @@ export default function App() {
       bulletMovementIntervalRef.current = setInterval(() => {
         setBullets((prevBullets) => {
           const newBullets = prevBullets
-            .map((bullet) => ({x: bullet.x, y: bullet.y - BULLET_SPEED}))
+            .map((bullet) => ({ x: bullet.x, y: bullet.y - BULLET_SPEED }))
             .filter((bullet) => {
               const bulletYRelative = bottomOfTheRiverRef.current + 50 + AIRPLANE_SIZE.height + playerPosition.current.y - AIRPLANE_SIZE.height / 2 - bullet.y;
               let found = false;
@@ -424,18 +425,18 @@ export default function App() {
                   const height = objects[object.type].size ? objects[object.type].size.height : object.height;
                   const width = objects[object.type].size ? objects[object.type].size.width : object.width;
 
-                  return ['helicopter', 'airplane', 'gasStation','bridge'].includes(object.type) && !object.destroyed &&
+                  return ['helicopter', 'airplane', 'gasStation', 'bridge'].includes(object.type) && !object.destroyed &&
                     bulletYRelative >= object.y - height / 2 + segment.offset &&
                     bulletYRelative <= object.y + height / 2 + segment.offset &&
                     bullet.x >= object.x - width / 2 &&
                     bullet.x <= object.x + width / 2;
                 });
                 if (object) {
-                    score.current += objects[object.type].score;
-                    startSound('explosion');
-                    addExplosion(bullet.x, bullet.y, bottomOfTheRiverRef.current);
-                    object.destroyed = true;
-                    found = true;
+                  score.current += objects[object.type].score;
+                  startSound('explosion');
+                  addExplosion(bullet.x, bullet.y, bottomOfTheRiverRef.current);
+                  object.destroyed = true;
+                  found = true;
                 }
               });
 
@@ -503,7 +504,7 @@ export default function App() {
     return (
       <Svg key={`bridges`} style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: movementViewDimensions.y - scrollingViewDimensions.y, }}>
         {segmentsInRange().reduce((bridges, segment, segmentIndex) => {
-          segment.objects.filter(_ => ['bridge'].includes(_.type)  && !_.destroyed).forEach((bridge, bridgeIndex) => {
+          segment.objects.filter(_ => ['bridge'].includes(_.type) && !_.destroyed).forEach((bridge, bridgeIndex) => {
             const n = bridge.points.length;
             for (let i = 0; i < n; i++) {
               const polygonPoints = bridge.points[i].map((p) => `${p.x},${mapY(p.y + segment.offset)}`).join(' ');
@@ -526,11 +527,11 @@ export default function App() {
   const renderObjects = () =>
     segmentsInRange().
       map((segment, segmentIndex) => {
-        return segment.objects.filter(_ => ['helicopter', 'tree', 'airplane', 'gasStation'].includes(_.type)  && !_.destroyed).map((object, objectIndex) => {
+        return segment.objects.filter(_ => ['helicopter', 'tree', 'airplane', 'gasStation'].includes(_.type) && !_.destroyed).map((object, objectIndex) => {
           return (
             <Image
               key={`${object.type}-${segmentIndex}-${objectIndex}`}
-              source={objects[object.type].image[object.direction??objects[object.type].movement]}
+              source={objects[object.type].image[object.direction ?? objects[object.type].movement]}
               style={{
                 position: 'absolute',
                 width: objects[object.type].size.width,
@@ -540,8 +541,30 @@ export default function App() {
               }}
             />
           );
-        })}
+        })
+      }
       );
+
+  const handleTouchStart = () => {
+    setIsShooting(true);
+    handleShoot();
+  };
+
+  const handleTouchEnd = () => {
+    setIsShooting(false);
+  };
+
+  useEffect(() => {
+    let interval;
+    if (isShooting && isGameRunning) {
+      interval = setInterval(() => {
+        handleShoot();
+      }, 100); // Adjust the shooting interval as needed
+    }
+    return () => {
+      clearInterval(interval); // Cleanup interval on unmount or when shooting stops
+    };
+  }, [isShooting, isGameRunning]);
 
   return (
     <View style={{ flex: 1, position: 'relative' }}>
@@ -605,8 +628,34 @@ export default function App() {
           ))}
         </View>
 
+        <View
+          style={{
+            position: 'absolute',
+            bottom: 20, // Distance from the bottom edge
+            left: 20,   // Distance from the left edge
+            width: 100,
+            height: 100,
+            backgroundColor: 'rgba(255, 0, 0, 0.3)', // Semi-transparent red
+            padding: 10,
+            borderRadius: 50,
+            zIndex: 100, // Ensure it floats above other content
+          }}
+          onStartShouldSetResponder={() => true}
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+          onTouchCandel={handleTouchEnd}
+        >
+          <Text style={{
+            color: 'white',
+            fontSize: 18,
+            fontWeight: 'bold',
+            textAlign: 'center',
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}>Shoot</Text>
+        </View>
+
         <View style={memoizedStyles.controlsStrip}>
-          <ShootButton onShoot={handleShoot} isGameRunning={isGameRunning.current} />
 
           {/* Right: Movement Area */}
           <MovementArea
