@@ -1,6 +1,5 @@
 import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { View, Text, Dimensions, Image, Alert, TouchableWithoutFeedbackBase } from 'react-native';
-import MovementArea from './MovementArea'; // Import the new MovementArea
 import riverSegmentGenerator from './RiverSegmentGenerator'; // Import the riverSegmentGenerator
 import ScrollingBackground from './ScrollingBackground';  // Import the scrolling background
 import LottieView from 'lottie-react-native';
@@ -27,7 +26,7 @@ const SPEED_SMOOTHER = 10;
 const SPEED_INIT = 40;
 const SPEED_MAX = 100;
 const SPEED_MIN = 10;
-const SPEED_BACK_TIMING = 100;
+const SPEED_BACK_TIMING = 500;
 
 const FUEL_INIT = 50;
 const FUEL_EMERGENCY_THRESHOLD = 15;
@@ -43,6 +42,7 @@ export default function App() {
   const [bullets, setBullets] = useState([]);
   const [scrollingViewDimensions, setScrollingViewDimensions] = useState({ x: 0, y: 0, width: 0, height: 0 });
   const [movementViewDimensions, setMovementViewDimensions] = useState({ x: 0, y: 0, width: 0, height: 0 });
+  const controlsStripAreaRef = useRef(null);
   const isGameRunning = useRef(false);
   const leftBorder = useRef(0);
   const rightBorder = useRef(0);
@@ -112,14 +112,19 @@ export default function App() {
     playerPosition.current = initialPosition.current;
   };
 
-  const handleMovementAreaDimensionsChange = (layout) => {
-    setMovementViewDimensions(layout);
-    initialPosition.current = { x: screenWidth / 2, y: layout.y - scrollingViewDimensions.y - 50 - AIRPLANE_SIZE.height / 2 };
-    playerPosition.current = initialPosition.current;
-  };
+  useEffect(() => {
+    if (controlsStripAreaRef.current) {
+      controlsStripAreaRef.current.measure((x, y, width, height, pageX, pageY) => {
+        const layout = { x: pageX, y: pageY, width: width, height: height };
+        setMovementViewDimensions(layout);
+        initialPosition.current = { x: screenWidth / 2, y: layout.y - scrollingViewDimensions.y - 50 - AIRPLANE_SIZE.height / 2 };
+        playerPosition.current = initialPosition.current;
+      });
+    }
+  }, []);
 
   const changeSpeed = (val) => {
-    const newSpeed = speed.current + val / SPEED_SMOOTHER;
+    const newSpeed = speed.current + Math.round(val / SPEED_SMOOTHER);
     speed.current = newSpeed >= SPEED_MAX ? SPEED_MAX : (newSpeed <= SPEED_MIN ? SPEED_MIN : newSpeed);
   };
 
@@ -129,7 +134,7 @@ export default function App() {
     if (!isGameRunning.current) {
       return;
     }
-    let newX = prev.x + val / AIRPLANE_SMOOTHER;
+    let newX = prev.x + Math.round(val / AIRPLANE_SMOOTHER);
     if (!checkForCollision(newX)) {
       playerPosition.current = { x: newX, y: prev.y };
     }
@@ -559,6 +564,29 @@ export default function App() {
     };
   }, [isShooting, isGameRunning]);
 
+  const lastPosition = useRef({ x: 0, y: 0 });
+
+  const getPosition = (event) => {
+    return { x: event.nativeEvent.pageX, y: event.nativeEvent.pageY };
+  };
+
+  const handleMoveStart = (event) => {
+    if (!isGameRunning) {
+      return;
+    }
+    lastPosition.current = getPosition(event);
+  };
+
+  const handleMoveMove = (event) => {
+    if (!isGameRunning) {
+      return;
+    }
+    const currentPosition = getPosition(event);
+    moveAirplane(currentPosition.x - lastPosition.current.x);
+    changeSpeed(-(currentPosition.y - lastPosition.current.y));
+    lastPosition.current = currentPosition;
+  };
+
   return (
     <View style={{ flex: 1, position: 'relative' }}>
       <View style={memoizedStyles.container}>
@@ -568,7 +596,10 @@ export default function App() {
           <Text style={memoizedStyles.infoText}>Fuel: {fuel.current}</Text>
         </View>
 
-        <View style={memoizedStyles.background}>
+        <View style={memoizedStyles.background}
+          onStartShouldSetResponder={() => true}
+          onTouchStart={handleMoveStart}
+          onTouchMove={handleMoveMove}>
           {/* Display the scrolling background with the river segments */}
           {riverSegments.river.length === 0 ? (
             <Text>Loading...</Text> // Show loading indicator while fetching data
@@ -631,7 +662,9 @@ export default function App() {
             backgroundColor: 'rgba(255, 0, 0, 0.3)', // Semi-transparent red
             padding: 10,
             borderRadius: 50,
-            zIndex: 100, // Ensure it floats above other content
+            zIndex: 100, // Ensure it floats above other
+            justifyContent: 'center',
+            alignItems: 'center',
           }}
           onStartShouldSetResponder={() => true}
           onTouchStart={handleTouchStart}
@@ -643,20 +676,10 @@ export default function App() {
             fontSize: 18,
             fontWeight: 'bold',
             textAlign: 'center',
-            justifyContent: 'center',
-            alignItems: 'center',
           }}>Shoot</Text>
         </View>
+        <View style={memoizedStyles.controlsStrip} ref={controlsStripAreaRef}>
 
-        <View style={memoizedStyles.controlsStrip}>
-
-          {/* Right: Movement Area */}
-          <MovementArea
-            onMove={(val) => moveAirplane(val)}
-            onChangeSpeed={(val) => changeSpeed(val)}
-            onDimensionsChange={handleMovementAreaDimensionsChange}
-            isGameRunning={isGameRunning.current}
-          />
         </View>
       </View>
     </View>
@@ -694,7 +717,7 @@ const styles = (screenWidth, screenHeight) => ({
   },
 
   controlsStrip: {
-    height: screenHeight * 0.2,
+    height: 140,
     flexDirection: 'row',
     backgroundColor: '#222',
   },
