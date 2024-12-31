@@ -22,9 +22,9 @@ const explosionJson = require('./assets/explosion2.json');
 
 const AIRPLANE_SIZE = { width: 50, height: 50 };
 const AIRPLANE_SMOOTHER = 10;
-const SPEED_SMOOTHER = 10;
+const SPEED_SMOOTHER = 5;
 const SPEED_INIT = 40;
-const SPEED_MAX = 100;
+const SPEED_MAX = 200;
 const SPEED_MIN = 10;
 const SPEED_BACK_TIMING = 500;
 
