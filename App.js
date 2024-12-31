@@ -22,10 +22,11 @@ const beepEffect = require('./assets/beep.mp3');
 const explosionJson = require('./assets/explosion2.json');
 
 const AIRPLANE_SIZE = { width: 50, height: 50 };
-const SPEED_INIT = 50;
+const AIRPLANE_SMOOTHER = 10;
+const SPEED_SMOOTHER = 10;
+const SPEED_INIT = 40;
 const SPEED_MAX = 100;
-const SPEED_MIN = 20;
-const SPEED_INCREASE_STEP = 5;
+const SPEED_MIN = 10;
 const SPEED_BACK_TIMING = 100;
 
 const FUEL_INIT = 50;
@@ -117,18 +118,18 @@ export default function App() {
     playerPosition.current = initialPosition.current;
   };
 
-  const moveAirplane = (direction) => {
+  const changeSpeed = (val) => {
+    const newSpeed = speed.current + val / SPEED_SMOOTHER;
+    speed.current = newSpeed >= SPEED_MAX ? SPEED_MAX : (newSpeed <= SPEED_MIN ? SPEED_MIN : newSpeed);
+  };
+
+  const moveAirplane = (val) => {
     const prev = playerPosition.current;
 
     if (!isGameRunning.current) {
       return;
     }
-    let newX = prev.x;
-    if (direction === 'left') {
-      newX--;
-    } else if (direction === 'right') {
-      newX++;
-    }
+    let newX = prev.x + val / AIRPLANE_SMOOTHER;
     if (!checkForCollision(newX)) {
       playerPosition.current = { x: newX, y: prev.y };
     }
@@ -250,14 +251,6 @@ export default function App() {
     const bullet = { x: playerPosition.current.x, y: playerPosition.current.y - AIRPLANE_SIZE.height / 2 };
 
     setBullets((prevBullets) => [...prevBullets, bullet]);
-  };
-
-  const startAcc = (acc) => {
-    if (acc === 'up') {
-      speed.current = speed.current >= SPEED_MAX ? SPEED_MAX : speed.current + SPEED_INCREASE_STEP;
-    } else if (acc === 'down') {
-      speed.current = speed.current <= SPEED_MIN ? SPEED_MIN : speed.current - SPEED_INCREASE_STEP;
-    }
   };
 
   onScrollPositionChange = (scrollPosition) => {
@@ -659,8 +652,8 @@ export default function App() {
 
           {/* Right: Movement Area */}
           <MovementArea
-            onMoveAcc={(dir) => moveAirplane(dir)}
-            onChangeAcc={(dir) => startAcc(dir)}
+            onMove={(val) => moveAirplane(val)}
+            onChangeSpeed={(val) => changeSpeed(val)}
             onDimensionsChange={handleMovementAreaDimensionsChange}
             isGameRunning={isGameRunning.current}
           />
